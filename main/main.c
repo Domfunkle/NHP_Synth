@@ -25,12 +25,18 @@
 
 // Static Variables
 static const char *TAG = "dac_oneshot_test";
-static uint8_t cosine_table[TABLE_SIZE];
 // Per-channel frequency, phase, and amplitude
 static volatile float current_freq[2] = {50, 50}; // [A, B]
 static volatile float current_phase[2] = {0, 0};
 static volatile float current_ampl[2] = {0.0f, 0.0f}; // Used for output (ramped)
 static volatile float target_ampl[2] = {1.0f, 0.5f}; // Set by UART, ramped to
+
+// Per-channel harmonic mixing
+static volatile int harmonic_order[2] = {0, 0}; // 0 = none, 3 = 3rd, 5 = 5th, etc.
+static volatile float harmonic_percent[2] = {0.0f, 0.0f}; // 0.0 to 1.0
+static volatile float harmonic_phase[2] = {0.0f, 0.0f}; // phase in radians
+// Per-channel cosine tables for harmonic mixing
+static uint8_t cosine_table[2][TABLE_SIZE];
 
 static volatile uint32_t dds_acc[2] = {0, 0};
 static volatile uint32_t dds_step[2] = {1, 1};
@@ -81,20 +87,26 @@ static gpio_config_t input_gpio_conf = {
 };
 
 // Function Declarations
-static void generate_cosine_table(int table_size);
+static void generate_cosine_table(int ch, int table_size);
 static void update_dds_step(int ch, float frequency, float period_us);
 static void uart_cmd_task(void *arg);
 static void dds_output(void);
 static void dds_timer_callback(void* arg);
 static void start_dds_timer(int64_t period_us);
 static void global_gpio_init(void);
+static void pause_dds_timer(void);
+static void resume_dds_timer(void);
 
 // Function Definitions
-static void generate_cosine_table(int table_size) {
+static void generate_cosine_table(int ch, int table_size) {
     for (int i = 0; i < table_size; i++) {
         float phase_val = 2.0f * M_PI * i / (float)table_size; // full cycle
-        uint8_t value = (uint8_t)((cosf(phase_val) * 127.5f) + 127.5f); // 0-255 range
-        cosine_table[i] = value;
+        float val = cosf(phase_val);
+        if (harmonic_order[ch] >= 3 && (harmonic_order[ch] % 2) == 1 && harmonic_percent[ch] > 0.0f) {
+            val = val * (1.0f - harmonic_percent[ch]) + harmonic_percent[ch] * cosf(harmonic_order[ch] * phase_val + harmonic_phase[ch]);
+        }
+        uint8_t value = (uint8_t)((val * 127.5f) + 127.5f); // 0-255 range
+        cosine_table[ch][i] = value;
     }
 }
 
@@ -178,13 +190,46 @@ static void uart_cmd_task(void *arg) {
                     if (ampl > 100.0f) ampl = 100.0f;
                     target_ampl[1] = ampl / 100.0f;
                     ESP_LOGI(TAG, "UART: Set channel B amplitude to %.2f (0-100, scaled to 0.0-1.0)", ampl);
+                } else if (strncmp(cmd_buf, "wha", 3) == 0 || strncmp(cmd_buf, "whb", 3) == 0) {
+                    int ch = (cmd_buf[2] == 'a') ? 0 : 1;
+                    int order = 0;
+                    float percent = 0.0f;
+                    float phase_deg = 0.0f;
+                    char *comma = strchr(cmd_buf + 3, ',');
+                    if (comma) {
+                        order = strtol(cmd_buf + 3, NULL, 10);
+                        percent = strtof(comma + 1, NULL);
+                        char *comma2 = strchr(comma + 1, ',');
+                        if (comma2) {
+                            phase_deg = strtof(comma2 + 1, NULL);
+                        }
+                        if (order < 3 || (order % 2) == 0) {
+                            ESP_LOGW(TAG, "UART: Harmonic order must be odd and >= 3");
+                        } else if (percent < 0.0f || percent > 100.0f) {
+                            ESP_LOGW(TAG, "UART: Harmonic percent must be 0-100");
+                        } else {
+                            harmonic_order[ch] = order;
+                            harmonic_percent[ch] = percent / 100.0f;
+                            harmonic_phase[ch] = phase_deg * (float)M_PI / 180.0f;
+                            pause_dds_timer();
+                            generate_cosine_table(ch, TABLE_SIZE);
+                            resume_dds_timer();
+                            ESP_LOGI(TAG, "UART: Channel %c: Mix in %d-th harmonic at %.1f%%, phase %.1f deg (table regenerated)", ch == 0 ? 'A' : 'B', order, percent, phase_deg);
+                        }
+                    } else {
+                        ESP_LOGW(TAG, "UART: Invalid harmonic command format. Use e.g. wha3,10 or wha3,10,-90");
+                    }
                 } else if (strcmp(cmd_buf, "buff") == 0) {
                     char buf_info[128];
                     snprintf(buf_info, sizeof(buf_info), "Output buffer content: A %.2f Hz, B %.2f Hz, table size: %d, A ampl: %.2f, B ampl: %.2f\r\n", current_freq[0], current_freq[1], TABLE_SIZE, current_ampl[0], current_ampl[1]);
                     uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
-                    for (int i = 0; i < TABLE_SIZE; i++) {
-                        snprintf(buf_info, sizeof(buf_info), "%d%s", cosine_table[i], (i < TABLE_SIZE - 1) ? "," : "\r\n");
+                    for (int ch = 0; ch < 2; ch++) {
+                        snprintf(buf_info, sizeof(buf_info), "Channel %c: ", ch == 0 ? 'A' : 'B');
                         uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
+                        for (int i = 0; i < TABLE_SIZE; i++) {
+                            snprintf(buf_info, sizeof(buf_info), "%d%s", cosine_table[ch][i], (i < TABLE_SIZE - 1) ? "," : "\r\n");
+                            uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
+                        }
                     }
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
@@ -195,6 +240,8 @@ static void uart_cmd_task(void *arg) {
                         "  wpb<deg>    Set channel B phase in degrees (e.g. wpb-90, range -180 to +180)\r\n"
                         "  waa<ampl>   Set channel A amplitude (0-100, e.g. waa50)\r\n"
                         "  wab<ampl>   Set channel B amplitude (0-100, e.g. wab80)\r\n"
+                        "  wha<order>,<pct>[,<phase>] Mix odd harmonic to channel A (e.g. wha3,10 or wha3,10,-90)\r\n"
+                        "  whb<order>,<pct>[,<phase>] Mix odd harmonic to channel B (e.g. whb5,20,45)\r\n"
                         "  buff        Output buffer content \r\n"
                         "  help        Show this help message\r\n";
                     uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
@@ -251,8 +298,8 @@ static void dds_output(void) {
             current_ampl[ch] = target_ampl[ch];
         }
         
-        uint16_t idx = ((dds_acc[ch] + (uint32_t)(current_phase[ch] * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE); // Calculate the index in the cosine table
-        values[ch] = (uint8_t)(cosine_table[idx] * current_ampl[ch]); // Scale the cosine value to the current amplitude
+        uint16_t idx = ((dds_acc[ch] + (uint32_t)(current_phase[ch] * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE);
+        values[ch] = (uint8_t)(cosine_table[ch][idx] * current_ampl[ch]);
     }
 
     // Output to DACs immediately one after the other
@@ -306,8 +353,22 @@ static void global_gpio_init(void) {
     gpio_set_intr_type(GPIO_INPUT_PIN, GPIO_INTR_POSEDGE);
 }
 
+static void pause_dds_timer(void) {
+    if (dds_timer.handle) {
+        esp_timer_stop(dds_timer.handle);
+    }
+}
+
+static void resume_dds_timer(void) {
+    if (dds_timer.handle) {
+        esp_timer_start_periodic(dds_timer.handle, dds_timer.period_us);
+    }
+}
+
 void app_main(void) {
-    generate_cosine_table(TABLE_SIZE);
+    for (int ch = 0; ch < 2; ch++) {
+        generate_cosine_table(ch, TABLE_SIZE);
+    }
     update_dds_step(0, current_freq[0], PERIOD_US);
     update_dds_step(1, current_freq[1], PERIOD_US);
     

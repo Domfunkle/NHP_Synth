@@ -6,6 +6,7 @@ This project implements a dual-channel Direct Digital Synthesis (DDS) signal gen
 - Precise square wave output (GPIO18) synchronized to DDS phase
 - UART command interface for real-time control
 - Phase, frequency, and amplitude control for each channel
+- Odd harmonic mixing with amplitude and phase control per channel
 - External sync input (GPIO19, rising edge)
 - High-resolution timer for accurate waveform generation
 
@@ -13,6 +14,7 @@ This project implements a dual-channel Direct Digital Synthesis (DDS) signal gen
 - **Frequency Range:** 20 Hz to 8 kHz (configurable)
 - **Amplitude Ramping:** Smooth amplitude changes to prevent clicks
 - **Phase Control:** Set phase offset for each channel
+- **Harmonic Mixing:** Add a single odd harmonic (3rd, 5th, 7th, etc) to either channel, with amplitude and phase control
 - **UART Commands:**
   - `wfa<freq>`: Set channel A frequency (Hz)
   - `wfb<freq>`: Set channel B frequency (Hz)
@@ -20,6 +22,8 @@ This project implements a dual-channel Direct Digital Synthesis (DDS) signal gen
   - `wpb<deg>`: Set channel B phase (degrees, -180 to +180)
   - `waa<ampl>`: Set channel A amplitude (0-100)
   - `wab<ampl>`: Set channel B amplitude (0-100)
+  - `wha<order>,<pct>[,<phase>]`: Mix odd harmonic to channel A (e.g. `wha3,10` for 10% 3rd harmonic, or `wha7,20,-90` for 20% 7th harmonic at -90° phase)
+  - `whb<order>,<pct>[,<phase>]`: Mix odd harmonic to channel B (e.g. `whb5,20,45` for 20% 5th harmonic at 45° phase)
   - `buff`: Output buffer content
   - `help`: Show help message
 
