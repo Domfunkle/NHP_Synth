@@ -40,8 +40,7 @@ idf.py -p /dev/ttyUSB0 flash
 To flash to multiple devices simultaneously:
 
 ```bash
-idf.py -p /dev/ttyUSB0 flash & idf.py -p /dev/ttyUSB1 flash
-wait
+idf.py -p /dev/ttyUSB0 flash && idf.py -p /dev/ttyUSB1 flash
 ```
 
 ## UART Usage
