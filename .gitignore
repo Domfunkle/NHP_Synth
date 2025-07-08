@@ -1,0 +1,60 @@
+# ESP-IDF/ESP32 build artifacts
+build/
+*.bin
+*.elf
+*.map
+*.pyc
+*.pyo
+*.pyd
+*.o
+*.obj
+*.a
+*.so
+*.d
+*.gcda
+*.gcno
+*.gcov
+*.orig
+*.swp
+*.swo
+*.bak
+*.tmp
+*.log
+*.out
+*.user
+*.DS_Store
+sdkconfig.old
+sdkconfig
+sdkconfig.*
+CMakeLists.txt.user
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+project_description.json
+flasher_args.json
+*.vscode/
+.vscode/
+.idea/
+*.launch
+*.code-workspace
+# Python virtualenv
+venv/
+.env/
+# Misc
+*.zip
+*.tar.gz
+*.tgz
+*.tar
+*.gz
+*.7z
+*.rar
+# Archive and backup
+*~
+# Ignore generated documentation
+docs/_build/
+# Ignore test output
+test-output/
+# Ignore core dumps
+core.*
+# Ignore main/archive/ if not source
+main/archive/
