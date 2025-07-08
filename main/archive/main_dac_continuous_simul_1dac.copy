@@ -1,0 +1,162 @@
+// Includes
+#include <stdio.h>
+#include <math.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/dac_continuous.h"
+#include "esp_log.h"
+#include "driver/uart.h"
+
+// Macros and Constants
+#define MAX_TABLE_SIZE 4092
+#define FIXED_SAMPLE_RATE 204600 // 50Hz sample rate for DAC
+#define MIN_FREQ 20
+#define MAX_FREQ 20000
+#define UART_NUM UART_NUM_0
+#define UART_RX_BUF_SIZE 256
+#define MAX_SAMPLE_RATE 1500000.0f
+
+// Static Variables
+static uint8_t cosine_table[MAX_TABLE_SIZE];
+static int current_table_size = MAX_TABLE_SIZE;
+static volatile float current_freq = 50; // Default frequency
+static const char *TAG = "dac_continuous_test";
+static volatile float phase = 0.0f;
+static TaskHandle_t dac_task_handle = NULL;
+static dac_continuous_handle_t dac_handle = NULL; // Make DAC handle global
+
+// Function Declarations
+static void generate_cosine_table(int table_size, float phase_shift);
+static void update_dac_sample_rate_and_table(float frequency);
+static void dac_output_task(void *arg);
+static void uart_cmd_task(void *arg);
+
+// Function Definitions
+static void generate_cosine_table(int table_size, float phase_shift) {
+    for (int i = 0; i < table_size; i++) {
+        float phase_val = 2.0f * M_PI * i / table_size + phase_shift;
+        uint8_t value = (uint8_t)((cosf(phase_val) + 1.0f) * 127.5f);
+        cosine_table[i] = value;
+    }
+    ESP_LOGI(TAG, "Generated cosine table (one period, phase=%.2f, size=%d)", phase_shift, table_size);
+}
+
+static void update_dac_sample_rate_and_table(float frequency) {
+    // Find the largest table size that keeps sample rate under 1 MHz
+    int table_size = MAX_TABLE_SIZE;
+    float sample_rate = table_size * frequency;
+    while (sample_rate > MAX_SAMPLE_RATE && table_size > 1) {
+        table_size--;
+        sample_rate = table_size * frequency;
+    }
+    current_table_size = table_size;
+    generate_cosine_table(table_size, phase);
+    // Disable DAC before updating
+    if (dac_handle) {
+        ESP_ERROR_CHECK(dac_continuous_disable(dac_handle));
+        ESP_ERROR_CHECK(dac_continuous_del_channels(dac_handle));
+    }
+    ESP_LOGI(TAG, "Set DAC sample rate to %df for commanded freq=%.2f, table_size=%d", (uint8_t)sample_rate, frequency, table_size);
+    dac_continuous_config_t cont_cfg = {
+        .chan_mask = DAC_CHANNEL_MASK_ALL,
+        .desc_num = 8,
+        .buf_size = 4092,
+        .offset = 0,
+        .clk_src = DAC_DIGI_CLK_SRC_APLL,
+        .chan_mode = DAC_CHANNEL_MODE_SIMUL,
+        .freq_hz = (uint32_t)sample_rate,
+    };
+    ESP_ERROR_CHECK(dac_continuous_new_channels(&cont_cfg, &dac_handle));
+    ESP_ERROR_CHECK(dac_continuous_enable(dac_handle));
+    ESP_ERROR_CHECK(dac_continuous_write_cyclically(dac_handle, cosine_table, table_size, NULL));
+}
+
+static void dac_output_task(void *arg) {
+    // Use initial frequency for sample rate and table size
+    update_dac_sample_rate_and_table(current_freq);
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Keep the task alive
+    }
+}
+
+static void uart_cmd_task(void *arg) {
+    uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity    = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
+    };
+    esp_err_t err = uart_driver_install(UART_NUM, UART_RX_BUF_SIZE, 0, 0, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "uart_driver_install failed: %d", err);
+        vTaskDelete(NULL);
+    }
+    uart_param_config(UART_NUM, &uart_config);
+    uart_set_pin(UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    ESP_LOGI(TAG, "UART command task started. Type 'help' for usage.");
+    char cmd_buf[32];
+    int cmd_pos = 0;
+    while (1) {
+        uint8_t ch;
+        int len = uart_read_bytes(UART_NUM, &ch, 1, pdMS_TO_TICKS(100));
+        if (len > 0) {
+            if (ch == '\r' || ch == '\n') {
+                cmd_buf[cmd_pos] = '\0';
+                if (strncmp(cmd_buf, "wf", 2) == 0) {
+                    float freq = strtof(cmd_buf + 2, NULL);
+                    if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
+                        current_freq = freq;
+                        update_dac_sample_rate_and_table(current_freq);
+                        ESP_LOGI(TAG, "UART: Set frequency to %f Hz", freq);
+                    } else {
+                        ESP_LOGW(TAG, "UART: Invalid frequency: %f (Allowed: %d-%d)", freq, MIN_FREQ, MAX_FREQ);
+                    }
+                } else if (strncmp(cmd_buf, "wp", 2) == 0) {
+                    float new_phase = strtof(cmd_buf + 2, NULL);
+                    // Clamp phase to [0, 359] and warn if out of range
+                    if (new_phase < 0.0f || new_phase > 359.0f) {
+                        ESP_LOGW(TAG, "UART: Invalid phase: %f (Allowed: 0-359)", new_phase);
+                    }
+                    if (new_phase < 0.0f) new_phase = 0.0f;
+                    if (new_phase > 359.0f) new_phase = 359.0f;
+                    phase = new_phase * (float)M_PI / 180.0f;
+                    update_dac_sample_rate_and_table(current_freq);
+                    ESP_LOGI(TAG, "UART: Set phase to %f degrees (%.2f radians)", new_phase, phase);
+                } else if (strcmp(cmd_buf, "buff") == 0) {
+                    char buf_info[128];
+                    snprintf(buf_info, sizeof(buf_info), "Output buffer content: %.2f Hz, table size: %d\r\n", current_freq, current_table_size);
+                    uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
+                    if (dac_task_handle) vTaskSuspend(dac_task_handle);
+                    // Output as comma-separated decimal values for Excel
+                    for (int i = 0; i < current_table_size; i++) {
+                        snprintf(buf_info, sizeof(buf_info), "%d%s", cosine_table[i], (i < current_table_size - 1) ? "," : "\r\n");
+                        uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
+                    }
+                    if (dac_task_handle) vTaskResume(dac_task_handle);
+                } else if (strcmp(cmd_buf, "help") == 0) {
+                    const char *help_msg =
+                        "Commands:\r\n"
+                        "  wf<freq>   Set frequency in Hz (e.g. wf1000)\r\n"
+                        "  wp<deg>    Set phase in degrees (e.g. wp90)\r\n"
+                        "  buff       Output buffer content \r\n"
+                        "  help       Show this help message\r\n";
+                    uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
+                } else if (cmd_pos > 0) {
+                    ESP_LOGW(TAG, "UART: Unknown command: '%s'", cmd_buf);
+                }
+                cmd_pos = 0;
+            } else if (cmd_pos < (int)sizeof(cmd_buf) - 1) {
+                cmd_buf[cmd_pos++] = ch;
+            }
+        }
+    }
+}
+
+void app_main(void) {
+    generate_cosine_table(current_table_size, phase);
+    ESP_LOGI(TAG, "Starting DAC cosine generator. Type 'help' in UART for usage. Frequency range: %d-%d Hz.", MIN_FREQ, MAX_FREQ);
+    xTaskCreatePinnedToCore(dac_output_task, "dac_output_task", 4096, NULL, 5, &dac_task_handle, 1);
+    xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 4096, NULL, 5, NULL, 0);
+}

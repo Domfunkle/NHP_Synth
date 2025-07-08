@@ -24,7 +24,6 @@ build/
 *.user
 *.DS_Store
 sdkconfig.old
-sdkconfig
 sdkconfig.*
 CMakeLists.txt.user
 CMakeCache.txt
@@ -56,5 +55,3 @@ docs/_build/
 test-output/
 # Ignore core dumps
 core.*
-# Ignore main/archive/ if not source
-main/archive/
