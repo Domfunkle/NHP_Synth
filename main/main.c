@@ -141,56 +141,38 @@ static void uart_cmd_task(void *arg) {
         if (len > 0) {
             if (ch == '\r' || ch == '\n') {
                 cmd_buf[cmd_pos] = '\0';
-                // Frequency commands
-                if (strncmp(cmd_buf, "wfa", 3) == 0) {
+                // Unified frequency command: wfa / wfb
+                if (strncmp(cmd_buf, "wf", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float freq = strtof(cmd_buf + 3, NULL);
                     if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
-                        current_freq[0] = freq;
-                        update_dds_step(0, current_freq[0], PERIOD_US);
-                        ESP_LOGI(TAG, "UART: Set channel A frequency to %f Hz", freq);
+                        current_freq[ch_idx] = freq;
+                        update_dds_step(ch_idx, current_freq[ch_idx], PERIOD_US);
+                        ESP_LOGI(TAG, "UART: Set channel %c frequency to %f Hz", ch_idx == 0 ? 'A' : 'B', freq);
                     } else {
-                        ESP_LOGW(TAG, "UART: Invalid channel A frequency: %f (Allowed: %d-%d)", freq, MIN_FREQ, MAX_FREQ);
+                        ESP_LOGW(TAG, "UART: Invalid channel %c frequency: %f (Allowed: %d-%d)", ch_idx == 0 ? 'A' : 'B', freq, MIN_FREQ, MAX_FREQ);
                     }
-                } else if (strncmp(cmd_buf, "wfb", 3) == 0) {
-                    float freq = strtof(cmd_buf + 3, NULL);
-                    if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
-                        current_freq[1] = freq;
-                        update_dds_step(1, current_freq[1], PERIOD_US);
-                        ESP_LOGI(TAG, "UART: Set channel B frequency to %f Hz", freq);
-                    } else {
-                        ESP_LOGW(TAG, "UART: Invalid channel B frequency: %f (Allowed: %d-%d)", freq, MIN_FREQ, MAX_FREQ);
-                    }
-                } else if (strncmp(cmd_buf, "wpa", 3) == 0) {
+                // Unified phase command: wpa / wpb
+                } else if (strncmp(cmd_buf, "wp", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float phase = strtof(cmd_buf + 3, NULL);
                     if (phase < -180.0f || phase > 180.0f) {
-                        ESP_LOGW(TAG, "UART: Invalid channel A phase: %f (Allowed: -180 to +180)", phase);
+                        ESP_LOGW(TAG, "UART: Invalid channel %c phase: %f (Allowed: -180 to +180)", ch_idx == 0 ? 'A' : 'B', phase);
                     }
                     if (phase < -180.0f) phase = -180.0f;
                     if (phase > 180.0f) phase = 180.0f;
-                    current_phase[0] = phase * (float)M_PI / 180.0f;
-                    ESP_LOGI(TAG, "UART: Set channel A phase to %f degrees (%.2f radians)", phase, current_phase[0]);
-                } else if (strncmp(cmd_buf, "wpb", 3) == 0) {
-                    float phase = strtof(cmd_buf + 3, NULL);
-                    if (phase < -180.0f || phase > 180.0f) {
-                        ESP_LOGW(TAG, "UART: Invalid channel B phase: %f (Allowed: -180 to +180)", phase);
-                    }
-                    if (phase < -180.0f) phase = -180.0f;
-                    if (phase > 180.0f) phase = 180.0f;
-                    current_phase[1] = phase * (float)M_PI / 180.0f;
-                    ESP_LOGI(TAG, "UART: Set channel B phase to %f degrees (%.2f radians)", phase, current_phase[1]);
-                } else if (strncmp(cmd_buf, "waa", 3) == 0) {
+                    current_phase[ch_idx] = phase * (float)M_PI / 180.0f;
+                    ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
+                // Unified amplitude command: waa / wab
+                } else if (strncmp(cmd_buf, "wa", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float ampl = strtof(cmd_buf + 3, NULL);
                     if (ampl < 0.0f) ampl = 0.0f;
                     if (ampl > 100.0f) ampl = 100.0f;
-                    target_ampl[0] = ampl / 100.0f;
-                    ESP_LOGI(TAG, "UART: Set channel A amplitude to %.2f (0-100, scaled to 0.0-1.0)", ampl);
-                } else if (strncmp(cmd_buf, "wab", 3) == 0) {
-                    float ampl = strtof(cmd_buf + 3, NULL);
-                    if (ampl < 0.0f) ampl = 0.0f;
-                    if (ampl > 100.0f) ampl = 100.0f;
-                    target_ampl[1] = ampl / 100.0f;
-                    ESP_LOGI(TAG, "UART: Set channel B amplitude to %.2f (0-100, scaled to 0.0-1.0)", ampl);
-                } else if (strncmp(cmd_buf, "wha", 3) == 0 || strncmp(cmd_buf, "whb", 3) == 0) {
+                    target_ampl[ch_idx] = ampl / 100.0f;
+                    ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
+                // Unified harmonic injection: wha / whb
+                } else if (strncmp(cmd_buf, "wh", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch = (cmd_buf[2] == 'a') ? 0 : 1;
                     int order = 0;
                     float percent = 0.0f;
@@ -234,16 +216,12 @@ static void uart_cmd_task(void *arg) {
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
                         "Commands:\r\n"
-                        "  wfa<freq>   Set channel A frequency in Hz (e.g. wfa1000)\r\n"
-                        "  wfb<freq>   Set channel B frequency in Hz (e.g. wfb1000)\r\n"
-                        "  wpa<deg>    Set channel A phase in degrees (e.g. wpa90, range -180 to +180)\r\n"
-                        "  wpb<deg>    Set channel B phase in degrees (e.g. wpb-90, range -180 to +180)\r\n"
-                        "  waa<ampl>   Set channel A amplitude (0-100, e.g. waa50)\r\n"
-                        "  wab<ampl>   Set channel B amplitude (0-100, e.g. wab80)\r\n"
-                        "  wha<order>,<pct>[,<phase>] Mix odd harmonic to channel A (e.g. wha3,10 or wha3,10,-90)\r\n"
-                        "  whb<order>,<pct>[,<phase>] Mix odd harmonic to channel B (e.g. whb5,20,45)\r\n"
-                        "  buff        Output buffer content \r\n"
-                        "  help        Show this help message\r\n";
+                        "  wf[a|b]<freq>   Set channel A or B frequency in Hz (e.g. wfa1000, wfb1000)\r\n"
+                        "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -180 to +180)\r\n"
+                        "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
+                        "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
+                        "  buff            Output buffer content \r\n"
+                        "  help            Show this help message\r\n";
                     uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
                 } else if (cmd_pos > 0) {
                     ESP_LOGW(TAG, "UART: Unknown command: '%s'", cmd_buf);
