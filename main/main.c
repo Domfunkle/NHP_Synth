@@ -12,7 +12,7 @@
 #include "driver/dac_oneshot.h"
 
 // Macros and Constants
-#define TABLE_SIZE (1 << 15)
+#define TABLE_SIZE (1 << 16)
 #define MIN_FREQ 20
 #define MAX_FREQ 8000
 #define UART_NUM UART_NUM_0
@@ -25,18 +25,16 @@
 
 // Static Variables
 static const char *TAG = "dac_oneshot_test";
-// Per-channel frequency, phase, and amplitude
+static uint8_t waveform_quarter_table[TABLE_SIZE / 4]; // Store only a quarter of the waveform table to save memory
+
+// Per-channel frequency, phase, amplitude, harmonic
 static volatile float current_freq[2] = {50, 50}; // [A, B]
 static volatile float current_phase[2] = {0, 0};
 static volatile float current_ampl[2] = {0.0f, 0.0f}; // Used for output (ramped)
 static volatile float target_ampl[2] = {1.0f, 0.5f}; // Set by UART, ramped to
-
-// Per-channel harmonic mixing
 static volatile int harmonic_order[2] = {0, 0}; // 0 = none, 3 = 3rd, 5 = 5th, etc.
 static volatile int harmonic_percent[2] = {0, 0}; // 0 to 100
 static volatile float harmonic_phase[2] = {0.0f, 0.0f}; // phase in radians
-static uint8_t base_cosine_table[TABLE_SIZE]; // Base cosine table for LUT
-static uint8_t waveform_table[2][TABLE_SIZE];   // Per-channel cosine tables for harmonic mixing
 
 static volatile uint32_t dds_acc[2] = {0, 0};
 static volatile uint32_t dds_step[2] = {1, 1};
@@ -87,8 +85,7 @@ static gpio_config_t input_gpio_conf = {
 };
 
 // Function Declarations
-static void generate_base_cosine_table(int table_size);
-static void generate_waveform(int ch, int table_size);
+static void generate_waveform(int table_size);
 static void update_dds_step(int ch, float frequency, float period_us);
 static void uart_cmd_task(void *arg);
 static void dds_output(void);
@@ -99,30 +96,31 @@ static void pause_dds_timer(void);
 static void resume_dds_timer(void);
 
 // Function Definitions
-static void generate_base_cosine_table(int table_size) {
-    for (int i = 0; i < table_size; i++) {
-        float phase_val = 2.0f * M_PI * i / (float)table_size;
+static void generate_waveform(int table_size) {
+    int quarter = table_size / 4;
+    for (int i = 0; i < quarter; i++) {
+        float phase_val = (M_PI_2 * i) / (float)quarter; // 0 to pi/2
         float val = cosf(phase_val);
         uint8_t value = (uint8_t)((val * 127.5f) + 127.5f); // 0-255 range
-        base_cosine_table[i] = value;
+        waveform_quarter_table[i] = value;
     }
 }
-
-static void generate_waveform(int ch, int table_size) {
-    for (int i = 0; i < table_size; i++) {
-        // Use LUT for base cosine
-        float base_val = ((float)base_cosine_table[i] - 127.5f) / 127.5f; // -1.0 to 1.0
-        float val = base_val;
-        // Harmonic mixing if needed
-        if (harmonic_order[ch] >= 3 && (harmonic_order[ch] % 2) == 1 && harmonic_percent[ch] > 0) {
-            float harmonic_percent_scaled = harmonic_percent[ch] / 100.0f; // Scale to 0.0 to 1.0
-            // Calculate harmonic index with phase offset
-            int harmonic_idx = (int)((((harmonic_order[ch] * i) % table_size) + (int)(harmonic_phase[ch] * (table_size / (2.0f * M_PI)))) % table_size);
-            float harmonic_val = ((float)base_cosine_table[harmonic_idx] - 127.5f) / 127.5f;
-            val = val * (1.0f - harmonic_percent_scaled) + harmonic_percent_scaled * harmonic_val;
-        }
-        uint8_t value = (uint8_t)((val * 127.5f) + 127.5f); // 0-255 range
-        waveform_table[ch][i] = value;
+// Helper to reconstruct full cosine using quarter table and symmetry
+static inline uint8_t get_waveform_value(uint32_t idx) {
+    uint32_t quarter = TABLE_SIZE / 4;
+    idx = idx % TABLE_SIZE;
+    if (idx < quarter) {
+        // 0 to pi/2: +cos
+        return waveform_quarter_table[idx];
+    } else if (idx < 2 * quarter) {
+        // pi/2 to pi: +cos (mirrored)
+        return 255 - waveform_quarter_table[quarter - 1 - (idx - quarter)];
+    } else if (idx < 3 * quarter) {
+        // pi to 3pi/2: -cos
+        return 255 - waveform_quarter_table[idx - 2 * quarter];
+    } else {
+        // 3pi/2 to 2pi: -cos (mirrored)
+        return waveform_quarter_table[quarter - 1 - (idx - 3 * quarter)];
     }
 }
 
@@ -209,25 +207,10 @@ static void uart_cmd_task(void *arg) {
                             harmonic_order[ch] = order;
                             harmonic_percent[ch] = percent;
                             harmonic_phase[ch] = phase_deg * (float)M_PI / 180.0f;
-                            // pause_dds_timer();
-                            generate_waveform(ch, TABLE_SIZE);
-                            // resume_dds_timer();
                             ESP_LOGI(TAG, "UART: Channel %c: Mix in %d-th harmonic at %.1f%%, phase %.1f deg (table regenerated)", ch == 0 ? 'A' : 'B', order, percent, phase_deg);
                         }
                     } else {
                         ESP_LOGW(TAG, "UART: Invalid harmonic command format. Use e.g. wha3,10 or wha3,10,-90");
-                    }
-                } else if (strcmp(cmd_buf, "buff") == 0) {
-                    char buf_info[128];
-                    snprintf(buf_info, sizeof(buf_info), "Output buffer content: A %.2f Hz, B %.2f Hz, table size: %d, A ampl: %.2f, B ampl: %.2f\r\n", current_freq[0], current_freq[1], TABLE_SIZE, current_ampl[0], current_ampl[1]);
-                    uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
-                    for (int ch = 0; ch < 2; ch++) {
-                        snprintf(buf_info, sizeof(buf_info), "Channel %c: ", ch == 0 ? 'A' : 'B');
-                        uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
-                        for (int i = 0; i < TABLE_SIZE; i++) {
-                            snprintf(buf_info, sizeof(buf_info), "%d%s", waveform_table[ch][i], (i < TABLE_SIZE - 1) ? "," : "\r\n");
-                            uart_write_bytes(UART_NUM, buf_info, strlen(buf_info));
-                        }
                     }
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
@@ -236,7 +219,6 @@ static void uart_cmd_task(void *arg) {
                         "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -180 to +180)\r\n"
                         "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
                         "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
-                        "  buff            Output buffer content \r\n"
                         "  help            Show this help message\r\n";
                     uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
                 } else if (cmd_pos > 0) {
@@ -291,9 +273,24 @@ static void dds_output(void) {
         } else {
             current_ampl[ch] = target_ampl[ch];
         }
-        
-        uint16_t idx = ((dds_acc[ch] + (uint32_t)(current_phase[ch] * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE);
-        values[ch] = (uint8_t)(waveform_table[ch][idx] * current_ampl[ch]);
+
+        // Phase accumulator for this sample
+        uint32_t phase_acc = (dds_acc[ch] + (uint32_t)(current_phase[ch] * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE;
+        // Use helper to get base waveform value
+        float base_val = ((float)get_waveform_value(phase_acc) - 127.5f) / 127.5f; // -1.0 to 1.0
+        float val = base_val;
+        // Harmonic mixing on the fly
+        if (harmonic_order[ch] >= 3 && (harmonic_order[ch] % 2) == 1 && harmonic_percent[ch] > 0) {
+            float harmonic_percent_scaled = harmonic_percent[ch] / 100.0f;
+            int harmonic_order_val = harmonic_order[ch];
+            float harmonic_phase_offset = harmonic_phase[ch];
+            uint32_t harmonic_phase_acc = (harmonic_order_val * phase_acc + (uint32_t)(harmonic_phase_offset * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE;
+            float harmonic_val = ((float)get_waveform_value(harmonic_phase_acc) - 127.5f) / 127.5f;
+            val = val * (1.0f - harmonic_percent_scaled) + harmonic_percent_scaled * harmonic_val;
+        }
+        // Convert to 0-255 and apply amplitude
+        uint8_t value = (uint8_t)(((val * 127.5f) + 127.5f) * current_ampl[ch]);
+        values[ch] = value;
     }
 
     // Output to DACs immediately one after the other
@@ -360,10 +357,7 @@ static void resume_dds_timer(void) {
 }
 
 void app_main(void) {
-    generate_base_cosine_table(TABLE_SIZE);
-    for (int ch = 0; ch < 2; ch++) {
-        generate_waveform(ch, TABLE_SIZE);
-    }
+    generate_waveform(TABLE_SIZE);
     update_dds_step(0, current_freq[0], PERIOD_US);
     update_dds_step(1, current_freq[1], PERIOD_US);
     
