@@ -22,7 +22,7 @@
 #define SQUARE_WAVE_HZ 50
 #define PERIOD_US 50         // period in microseconds for DDS output
 #define AMPL_RAMP_STEP 5e-5 // Adjust for ramp speed (smaller = slower)
-#define MAX_HARMONICS 6 // Maximum harmonics per channel
+#define MAX_HARMONICS 8 // Maximum harmonics across both channels
 #define PHASE_SCALE (int)(TABLE_SIZE / (2.0 * M_PI))
 #define M_PI_180 (M_PI / 180.0f)
 
@@ -224,6 +224,15 @@ static void uart_cmd_task(void *arg) {
                         } else if (percent < 0.0f || percent > 100.0f) {
                             ESP_LOGW(TAG, "UART: Harmonic percent must be 0-100");
                         } else {
+                            // Count total harmonics in use globally
+                            int total_harmonics = 0;
+                            for (int c = 0; c < 2; ++c) {
+                                for (int i = 0; i < MAX_HARMONICS; ++i) {
+                                    if (harmonics[c][i].order >= 3 && harmonics[c][i].percent > 0.0f) {
+                                        total_harmonics++;
+                                    }
+                                }
+                            }
                             // Add or update harmonic for this channel
                             int found = 0;
                             for (int i = 0; i < MAX_HARMONICS; ++i) {
@@ -236,20 +245,20 @@ static void uart_cmd_task(void *arg) {
                                 }
                             }
                             if (!found && percent > 0.0f) {
-                                // Add new harmonic if not found and percent > 0
-                                for (int i = 0; i < MAX_HARMONICS; ++i) {
-                                    if (harmonics[ch_idx][i].order == 0 || harmonics[ch_idx][i].percent == 0.0f) {
-                                        harmonics[ch_idx][i].order = order;
-                                        harmonics[ch_idx][i].percent = percent / 100.0f;
-                                        harmonics[ch_idx][i].phase = phase_deg * M_PI_180;
-                                        harmonics[ch_idx][i].phase_offset_int = (int)(harmonics[ch_idx][i].phase * PHASE_SCALE);
-                                        found = 1;
-                                        break;
+                                if (total_harmonics < MAX_HARMONICS) {
+                                    for (int i = 0; i < MAX_HARMONICS; ++i) {
+                                        if (harmonics[ch_idx][i].order == 0 || harmonics[ch_idx][i].percent == 0.0f) {
+                                            harmonics[ch_idx][i].order = order;
+                                            harmonics[ch_idx][i].percent = percent / 100.0f;
+                                            harmonics[ch_idx][i].phase = phase_deg * M_PI_180;
+                                            harmonics[ch_idx][i].phase_offset_int = (int)(harmonics[ch_idx][i].phase * PHASE_SCALE);
+                                            found = 1;
+                                            break;
+                                        }
                                     }
+                                } else {
+                                    ESP_LOGW(TAG, "UART: Max harmonics reached globally");
                                 }
-                            }
-                            if (!found && percent > 0.0f) {
-                                ESP_LOGW(TAG, "UART: Max harmonics reached for channel %c", ch_idx == 0 ? 'A' : 'B');
                             }
                             // If percent is 0, the harmonic is disabled (kept in list but ignored)
                         }
