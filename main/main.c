@@ -22,6 +22,19 @@
 #define SQUARE_WAVE_HZ 50
 #define PERIOD_US 50         // period in microseconds for DDS output
 #define AMPL_RAMP_STEP 5e-5 // Adjust for ramp speed (smaller = slower)
+#define MAX_HARMONICS 6 // Maximum harmonics per channel
+#define PHASE_SCALE (int)(TABLE_SIZE / (2.0 * M_PI))
+#define M_PI_180 (M_PI / 180.0f)
+
+// Per-channel harmonics (arrays for multiple harmonics)
+typedef struct {
+    int order;
+    float percent; // 0-100
+    float phase;   // radians
+    int phase_offset_int; // cached phase offset for DDS
+} harmonic_t;
+
+static volatile harmonic_t harmonics[2][MAX_HARMONICS] = {{{0}}};
 
 // Static Variables
 static const char *TAG = "dac_oneshot_test";
@@ -32,9 +45,6 @@ static volatile float current_freq[2] = {50, 50}; // [A, B]
 static volatile float current_phase[2] = {0, 0};
 static volatile float current_ampl[2] = {0.0f, 0.0f}; // Used for output (ramped)
 static volatile float target_ampl[2] = {1.0f, 0.5f}; // Set by UART, ramped to
-static volatile int harmonic_order[2] = {0, 0}; // 0 = none, 3 = 3rd, 5 = 5th, etc.
-static volatile int harmonic_percent[2] = {0, 0}; // 0 to 100
-static volatile float harmonic_phase[2] = {0.0f, 0.0f}; // phase in radians
 
 static volatile uint32_t dds_acc[2] = {0, 0};
 static volatile uint32_t dds_step[2] = {1, 1};
@@ -106,7 +116,7 @@ static void generate_waveform(int table_size) {
     }
 }
 // Helper to reconstruct full cosine using quarter table and symmetry
-static inline uint8_t get_waveform_value(uint32_t idx) {
+static uint8_t get_waveform_value(uint32_t idx) {
     uint32_t quarter = TABLE_SIZE / 4;
     idx = idx % TABLE_SIZE;
     if (idx < quarter) {
@@ -126,7 +136,7 @@ static inline uint8_t get_waveform_value(uint32_t idx) {
 
 static void update_dds_step(int ch, float frequency, float period_us) {
     dds_step[ch] = (TABLE_SIZE * frequency * period_us / 1000000);
-    dds_phase_offset[ch] = (uint32_t)(current_phase[ch] * TABLE_SIZE / (2.0f * M_PI));
+    dds_phase_offset[ch] = (uint32_t)(current_phase[ch] * PHASE_SCALE);
     // ESP_LOGI(TAG, "DDS step and phase offset updated for channel %d: step %lu, phase offset %lu for frequency %.2f Hz", 
     //          ch, dds_step[ch], dds_phase_offset[ch], frequency);
 }
@@ -175,7 +185,7 @@ static void uart_cmd_task(void *arg) {
                     }
                     if (phase < -180.0f) phase = -180.0f;
                     if (phase > 180.0f) phase = 180.0f;
-                    current_phase[ch_idx] = phase * (float)M_PI / 180.0f;
+                    current_phase[ch_idx] = phase * M_PI_180;
                     // ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
                 // Unified amplitude command: waa / wab
                 } else if (strncmp(cmd_buf, "wa", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
@@ -185,9 +195,19 @@ static void uart_cmd_task(void *arg) {
                     if (ampl > 100.0f) ampl = 100.0f;
                     target_ampl[ch_idx] = ampl / 100.0f;
                     // ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
+                // Shortcut: clear all harmonics for a channel (must come before wh[a|b] command)
+                } else if ((strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'a') ||
+                           (strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'b')) {
+                    int ch_idx = (cmd_buf[4] == 'a') ? 0 : 1;
+                    for (int i = 0; i < MAX_HARMONICS; ++i) {
+                        harmonics[ch_idx][i].order = 0;
+                        harmonics[ch_idx][i].percent = 0.0f;
+                        harmonics[ch_idx][i].phase = 0.0f;
+                    }
+                    // ESP_LOGI(TAG, "UART: Cleared all harmonics for channel %c", ch_idx == 0 ? 'A' : 'B');
                 // Unified harmonic injection: wha / whb
                 } else if (strncmp(cmd_buf, "wh", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
-                    int ch = (cmd_buf[2] == 'a') ? 0 : 1;
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     int order = 0;
                     float percent = 0.0f;
                     float phase_deg = 0.0f;
@@ -204,10 +224,34 @@ static void uart_cmd_task(void *arg) {
                         } else if (percent < 0.0f || percent > 100.0f) {
                             ESP_LOGW(TAG, "UART: Harmonic percent must be 0-100");
                         } else {
-                            harmonic_order[ch] = order;
-                            harmonic_percent[ch] = percent;
-                            harmonic_phase[ch] = phase_deg * (float)M_PI / 180.0f;
-                            // ESP_LOGI(TAG, "UART: Channel %c: Mix in %d-th harmonic at %.1f%%, phase %.1f deg (table regenerated)", ch == 0 ? 'A' : 'B', order, percent, phase_deg);
+                            // Add or update harmonic for this channel
+                            int found = 0;
+                            for (int i = 0; i < MAX_HARMONICS; ++i) {
+                                if (harmonics[ch_idx][i].order == order) {
+                                    harmonics[ch_idx][i].percent = percent / 100.0f;
+                                    harmonics[ch_idx][i].phase = phase_deg * M_PI_180;
+                                    harmonics[ch_idx][i].phase_offset_int = (int)(harmonics[ch_idx][i].phase * PHASE_SCALE);
+                                    found = 1;
+                                    break;
+                                }
+                            }
+                            if (!found && percent > 0.0f) {
+                                // Add new harmonic if not found and percent > 0
+                                for (int i = 0; i < MAX_HARMONICS; ++i) {
+                                    if (harmonics[ch_idx][i].order == 0 || harmonics[ch_idx][i].percent == 0.0f) {
+                                        harmonics[ch_idx][i].order = order;
+                                        harmonics[ch_idx][i].percent = percent / 100.0f;
+                                        harmonics[ch_idx][i].phase = phase_deg * M_PI_180;
+                                        harmonics[ch_idx][i].phase_offset_int = (int)(harmonics[ch_idx][i].phase * PHASE_SCALE);
+                                        found = 1;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!found && percent > 0.0f) {
+                                ESP_LOGW(TAG, "UART: Max harmonics reached for channel %c", ch_idx == 0 ? 'A' : 'B');
+                            }
+                            // If percent is 0, the harmonic is disabled (kept in list but ignored)
                         }
                     } else {
                         ESP_LOGW(TAG, "UART: Invalid harmonic command format. Use e.g. wha3,10 or wha3,10,-90");
@@ -219,6 +263,7 @@ static void uart_cmd_task(void *arg) {
                         "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -180 to +180)\r\n"
                         "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
                         "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
+                        "  whcl[a|b]         Remove all harmonics from channel A or B (e.g. whcla, whclb)\r\n"
                         "  help            Show this help message\r\n";
                     uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
                 } else if (cmd_pos > 0) {
@@ -275,19 +320,35 @@ static void dds_output(void) {
         }
 
         // Phase accumulator for this sample
-        uint32_t phase_acc = (dds_acc[ch] + (uint32_t)(current_phase[ch] * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE;
+        uint32_t phase_acc = (dds_acc[ch] + (uint32_t)(current_phase[ch] * PHASE_SCALE)) % TABLE_SIZE;
         // Use helper to get base waveform value
-        float base_val = ((float)get_waveform_value(phase_acc) - 127.5f) / 127.5f; // -1.0 to 1.0
-        float val = base_val;
-        // Harmonic mixing on the fly
-        if (harmonic_order[ch] >= 3 && (harmonic_order[ch] % 2) == 1 && harmonic_percent[ch] > 0) {
-            float harmonic_percent_scaled = harmonic_percent[ch] / 100.0f;
-            int harmonic_order_val = harmonic_order[ch];
-            float harmonic_phase_offset = harmonic_phase[ch];
-            uint32_t harmonic_phase_acc = (harmonic_order_val * phase_acc + (uint32_t)(harmonic_phase_offset * (TABLE_SIZE / (2.0f * M_PI)))) % TABLE_SIZE;
-            float harmonic_val = ((float)get_waveform_value(harmonic_phase_acc) - 127.5f) / 127.5f;
-            val = val * (1.0f - harmonic_percent_scaled) + harmonic_percent_scaled * harmonic_val;
+        float fundamental_val = ((float)get_waveform_value(phase_acc) - 127.5f) / 127.5f; // -1.0 to 1.0
+        float harmonics_sum = 0.0f;
+        float harmonics_total_scale = 0.0f;
+
+        // Sum all harmonics
+        for (int i = 0; i < MAX_HARMONICS; ++i) {
+            if (harmonics[ch][i].order >= 3 && (harmonics[ch][i].order % 2) == 1 && harmonics[ch][i].percent > 0.0f) {
+                int harmonic_order_val = harmonics[ch][i].order;
+                int harmonic_phase_offset_int = harmonics[ch][i].phase_offset_int;
+                int harmonic_phase_acc_int = (harmonic_order_val * (int)phase_acc + harmonic_phase_offset_int) % TABLE_SIZE;
+                float harmonic_val = ((float)get_waveform_value(harmonic_phase_acc_int) - 127.5f) / 127.5f; // -1.0 to 1.0
+                float harmonic_scale = harmonics[ch][i].percent;
+                harmonics_sum += harmonic_val * harmonic_scale;
+                harmonics_total_scale += fabsf(harmonic_scale);
+            }
         }
+
+        // Final value: fundamental + sum of harmonics
+        float val = fundamental_val + harmonics_sum;
+        // Calculate normalization factor to avoid peak capping
+        float normalization = 1.0f + harmonics_total_scale;
+        if (normalization > 1.0f) {
+            val /= normalization;
+        }
+        // Clamp val to -1.0..1.0
+        if (val > 1.0f) val = 1.0f;
+        if (val < -1.0f) val = -1.0f;
         // Convert to 0-255 and apply amplitude
         uint8_t value = (uint8_t)(((val * 127.5f) + 127.5f) * current_ampl[ch]);
         values[ch] = value;
