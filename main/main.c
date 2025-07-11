@@ -110,27 +110,27 @@ static void generate_waveform(int table_size) {
     int quarter = table_size / 4;
     for (int i = 0; i < quarter; i++) {
         float phase_val = (M_PI_2 * i) / (float)quarter; // 0 to pi/2
-        float val = cosf(phase_val);
+        float val = sinf(phase_val);
         uint8_t value = (uint8_t)((val * 127.5f) + 127.5f); // 0-255 range
         waveform_quarter_table[i] = value;
     }
 }
-// Helper to reconstruct full cosine using quarter table and symmetry
+// Helper to reconstruct full sine using quarter table and symmetry
 static uint8_t get_waveform_value(uint32_t idx) {
     uint32_t quarter = TABLE_SIZE / 4;
     idx = idx % TABLE_SIZE;
     if (idx < quarter) {
-        // 0 to pi/2: +cos
+        // 0 to pi/2: +sin
         return waveform_quarter_table[idx];
     } else if (idx < 2 * quarter) {
-        // pi/2 to pi: +cos (mirrored)
-        return 255 - waveform_quarter_table[quarter - 1 - (idx - quarter)];
+        // pi/2 to pi: +sin (mirrored, inverted)
+        return waveform_quarter_table[quarter - 1 - (idx - quarter)];
     } else if (idx < 3 * quarter) {
-        // pi to 3pi/2: -cos
+        // pi to 3pi/2: -sin
         return 255 - waveform_quarter_table[idx - 2 * quarter];
     } else {
-        // 3pi/2 to 2pi: -cos (mirrored)
-        return waveform_quarter_table[quarter - 1 - (idx - 3 * quarter)];
+        // 3pi/2 to 2pi: -sin (mirrored, inverted)
+        return 255 - waveform_quarter_table[quarter - 1 - (idx - 3 * quarter)];
     }
 }
 
