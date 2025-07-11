@@ -146,7 +146,7 @@ static void uart_cmd_task(void *arg) {
     }
     uart_param_config(UART_NUM, &uart_config);
     uart_set_pin(UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-    ESP_LOGI(TAG, "UART command task started. Type 'help' for usage.");
+    // ESP_LOGI(TAG, "UART command task started. Type 'help' for usage.");
     char cmd_buf[32];
     int cmd_pos = 0;
     while (1) {
