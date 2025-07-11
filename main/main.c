@@ -127,8 +127,8 @@ static inline uint8_t get_waveform_value(uint32_t idx) {
 static void update_dds_step(int ch, float frequency, float period_us) {
     dds_step[ch] = (TABLE_SIZE * frequency * period_us / 1000000);
     dds_phase_offset[ch] = (uint32_t)(current_phase[ch] * TABLE_SIZE / (2.0f * M_PI));
-    ESP_LOGI(TAG, "DDS step and phase offset updated for channel %d: step %lu, phase offset %lu for frequency %.2f Hz", 
-             ch, dds_step[ch], dds_phase_offset[ch], frequency);
+    // ESP_LOGI(TAG, "DDS step and phase offset updated for channel %d: step %lu, phase offset %lu for frequency %.2f Hz", 
+    //          ch, dds_step[ch], dds_phase_offset[ch], frequency);
 }
 
 static void uart_cmd_task(void *arg) {
@@ -162,7 +162,7 @@ static void uart_cmd_task(void *arg) {
                     if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
                         current_freq[ch_idx] = freq;
                         update_dds_step(ch_idx, current_freq[ch_idx], PERIOD_US);
-                        ESP_LOGI(TAG, "UART: Set channel %c frequency to %f Hz", ch_idx == 0 ? 'A' : 'B', freq);
+                        // ESP_LOGI(TAG, "UART: Set channel %c frequency to %f Hz", ch_idx == 0 ? 'A' : 'B', freq);
                     } else {
                         ESP_LOGW(TAG, "UART: Invalid channel %c frequency: %f (Allowed: %d-%d)", ch_idx == 0 ? 'A' : 'B', freq, MIN_FREQ, MAX_FREQ);
                     }
@@ -176,7 +176,7 @@ static void uart_cmd_task(void *arg) {
                     if (phase < -180.0f) phase = -180.0f;
                     if (phase > 180.0f) phase = 180.0f;
                     current_phase[ch_idx] = phase * (float)M_PI / 180.0f;
-                    ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
+                    // ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
                 // Unified amplitude command: waa / wab
                 } else if (strncmp(cmd_buf, "wa", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
@@ -184,7 +184,7 @@ static void uart_cmd_task(void *arg) {
                     if (ampl < 0.0f) ampl = 0.0f;
                     if (ampl > 100.0f) ampl = 100.0f;
                     target_ampl[ch_idx] = ampl / 100.0f;
-                    ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
+                    // ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
                 // Unified harmonic injection: wha / whb
                 } else if (strncmp(cmd_buf, "wh", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch = (cmd_buf[2] == 'a') ? 0 : 1;
@@ -207,7 +207,7 @@ static void uart_cmd_task(void *arg) {
                             harmonic_order[ch] = order;
                             harmonic_percent[ch] = percent;
                             harmonic_phase[ch] = phase_deg * (float)M_PI / 180.0f;
-                            ESP_LOGI(TAG, "UART: Channel %c: Mix in %d-th harmonic at %.1f%%, phase %.1f deg (table regenerated)", ch == 0 ? 'A' : 'B', order, percent, phase_deg);
+                            // ESP_LOGI(TAG, "UART: Channel %c: Mix in %d-th harmonic at %.1f%%, phase %.1f deg (table regenerated)", ch == 0 ? 'A' : 'B', order, percent, phase_deg);
                         }
                     } else {
                         ESP_LOGW(TAG, "UART: Invalid harmonic command format. Use e.g. wha3,10 or wha3,10,-90");
@@ -362,7 +362,7 @@ void app_main(void) {
     update_dds_step(1, current_freq[1], PERIOD_US);
     
     global_gpio_init();
-    ESP_LOGI(TAG, "Starting DAC DDS generator. Type 'help' in UART for usage. Frequency range: %d-%d Hz.", MIN_FREQ, MAX_FREQ);
+    // ESP_LOGI(TAG, "Starting DAC DDS generator. Type 'help' in UART for usage. Frequency range: %d-%d Hz.", MIN_FREQ, MAX_FREQ);
     xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 4096, NULL, 5, NULL, 0);
     start_dds_timer(PERIOD_US);
 }
