@@ -297,12 +297,18 @@ static void dds_output(void) {
 
     // --- Square wave generation using DDS timer ---
     if (!sqw_initialized) {
-        // Calculate how many DDS timer periods per half square wave period
-        sqw_period_ticks = (int)((1000000.0 / (2 * SQUARE_WAVE_HZ)) / PERIOD_US);
+        // Calculate how many DDS timer periods per half square wave period using channel A frequency
+        sqw_period_ticks = (int)((1000000.0 / (2 * current_freq[0])) / PERIOD_US);
         sqw_acc = 0;
         sqw_output_state = 0;
         sqw_initialized = true;
         gpio_set_level(SQUARE_WAVE_OUTPUT, sqw_output_state);
+    } else {
+        // Recalculate period ticks if channel A frequency has changed
+        int new_period_ticks = (int)((1000000.0 / (2 * current_freq[0])) / PERIOD_US);
+        if (new_period_ticks != sqw_period_ticks) {
+            sqw_period_ticks = new_period_ticks;
+        }
     }
     if (sqw_acc >= sqw_period_ticks) {
         sqw_output_state = !sqw_output_state;
