@@ -29,18 +29,53 @@ This project implements a dual-channel Direct Digital Synthesis (DDS) signal gen
 - **Square Wave Output:** GPIO18
 - **Sync Input:** GPIO19 (rising edge, with pulldown)
 
+## Project Structure
+
+```
+NHP_Synth/
+├── firmware/           # ESP32 firmware (ESP-IDF project)
+│   ├── main/          # Main application source
+│   ├── .devcontainer/ # ESP-IDF development container
+│   └── .vscode/       # ESP32-specific VS Code settings
+├── host/              # Python host control interface
+│   ├── synth_control/ # Python control library
+│   ├── examples/      # Usage examples
+│   ├── .devcontainer/ # Python development container
+│   └── .vscode/       # Python-specific VS Code settings
+├── tools/             # Shared utilities and scripts
+└── .vscode/           # Root workspace configuration
+```
+
 ## Build & Flash
-This project uses ESP-IDF. To build and flash:
+
+### Firmware (ESP32)
+Navigate to the firmware directory and use ESP-IDF:
 
 ```bash
+cd firmware
 idf.py build
 idf.py -p /dev/ttyUSB0 flash
 ```
 
-To flash to multiple devices simultaneously:
+Or use the convenient script for multiple devices:
 
 ```bash
-idf.py -p /dev/ttyUSB0 flash && idf.py -p /dev/ttyUSB1 flash
+./tools/flash_multiple.sh
+```
+
+## Host Control (Python)
+
+A Python interface is provided for programmatic control:
+
+```bash
+cd host
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Run examples
+python examples/basic_control.py
+python examples/harmonic_sweep.py
 ```
 
 ## UART Usage
@@ -49,24 +84,60 @@ Connect to the ESP32 UART (default 115200 baud) and type commands as described a
 ## Linux commands to test UART
 ```bash
 # Generate a square wave on Channel A at 50Hz
-printf "wha3,33\r" > /dev/ttyUSB1;
-printf "wha5,20\r" > /dev/ttyUSB1;
-printf "wha7,14\r" > /dev/ttyUSB1;
-printf "wha9,11\r" > /dev/ttyUSB1;
-printf "wha11,9\r" > /dev/ttyUSB1;
-printf "wha13,8\r" > /dev/ttyUSB1;
-printf "wha15,7\r" > /dev/ttyUSB1;
-printf "wha17,6\r" > /dev/ttyUSB1;
+printf "wha3,33\r" > /dev/ttyUSB1
+printf "wha5,20\r" > /dev/ttyUSB1
+printf "wha7,14\r" > /dev/ttyUSB1
+printf "wha9,11\r" > /dev/ttyUSB1
+printf "wha11,9\r" > /dev/ttyUSB1
+printf "wha13,8\r" > /dev/ttyUSB1
+printf "wha15,7\r" > /dev/ttyUSB1
+printf "wha17,6\r" > /dev/ttyUSB1
 ```
 
 ```bash
-# Clear all harmonics for Channel A
-printf "whcla\r" > /dev/ttyUSB1;
+# Clear all harmonics for Channel A and B
+printf "whcla\r" > /dev/ttyUSB1
+printf "whclb\r" > /dev/ttyUSB1
 ```
 
+```bash
+# Rolling harmonic phase for Channel A and B
+ph=-180
+while true; do
+    printf "wha5,20,%d\n" "$ph" > /dev/ttyUSB1
+    invph=$((ph * -1))
+    printf "whb3,10,%d\n" "$invph" > /dev/ttyUSB1
+    sleep 0.03
+    ph=$((ph + 1))
+    if [ "$ph" -gt 180 ]; then
+        ph=-180
+    fi
+done
+```
+
+## Development
+
+### VS Code Workspace
+Open the multi-root workspace for unified development:
+```bash
+code .vscode/NHP_Synth.code-workspace
+```
+
+### DevContainers
+Each component has its own development container:
+- **Firmware**: ESP-IDF container with all tools
+- **Host**: Python container with analysis libraries
+
+### Tools
+- `tools/flash_multiple.sh` - Flash firmware to multiple devices
+- `tools/uart_test.py` - Test UART communication
+
 ## File Structure
-- `main/main.c`: Main application source
-- `build/`: Build artifacts (ignored by git)
+- `firmware/main/main.c`: Main ESP32 application source
+- `firmware/build/`: Build artifacts (ignored by git)
+- `host/synth_control/`: Python control library
+- `host/examples/`: Python usage examples
+- `tools/`: Shared utilities and scripts
 - `.gitignore`: Excludes build and config files from version control
 
 ## License

@@ -1,0 +1,6 @@
+pyserial
+numpy
+matplotlib
+adafruit-circuitpython-seesaw
+adafruit-blinka
+lgpio

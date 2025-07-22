@@ -1,11 +1,9 @@
 # ESP-IDF/ESP32 build artifacts
-build/
+firmware/build/
+firmware/sdkconfig.old
 *.bin
 *.elf
 *.map
-*.pyc
-*.pyo
-*.pyd
 *.o
 *.obj
 *.a
@@ -14,6 +12,24 @@ build/
 *.gcda
 *.gcno
 *.gcov
+
+# Python
+host/__pycache__/
+host/*.egg-info/
+host/.pytest_cache/
+host/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
 *.orig
 *.swp
 *.swo
