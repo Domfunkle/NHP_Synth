@@ -339,7 +339,6 @@ static void dds_output(void) {
         // Use helper to get base waveform value
         float fundamental_val = ((float)get_waveform_value(phase_acc) - 127.5f) / 127.5f; // -1.0 to 1.0
         float harmonics_sum = 0.0f;
-        float harmonics_total_scale = 0.0f;
 
         // Sum all harmonics
         for (int i = 0; i < MAX_HARMONICS; ++i) {
@@ -350,22 +349,23 @@ static void dds_output(void) {
                 float harmonic_val = ((float)get_waveform_value(harmonic_phase_acc_int) - 127.5f) / 127.5f; // -1.0 to 1.0
                 float harmonic_scale = harmonics[ch][i].percent;
                 harmonics_sum += harmonic_val * harmonic_scale;
-                harmonics_total_scale += fabsf(harmonic_scale);
             }
         }
 
-        // Final value: fundamental + sum of harmonics
+        // Final value: fundamental + sum of harmonics (no normalization)
         float val = fundamental_val + harmonics_sum;
-        // Calculate normalization factor to avoid peak capping
-        float normalization = 1.0f + harmonics_total_scale;
-        if (normalization > 1.0f) {
-            val /= normalization;
-        }
-        // Clamp val to -1.0..1.0
-        if (val > 1.0f) val = 1.0f;
-        if (val < -1.0f) val = -1.0f;
-        // Convert to 0-255 and apply amplitude
-        uint8_t value = (uint8_t)(((val * 127.5f) + 127.5f) * current_ampl[ch]);
+        
+        // Apply amplitude scaling first
+        val *= current_ampl[ch];
+        
+        // Convert to 0-255 range
+        float dac_val = (val * 127.5f) + 127.5f;
+        
+        // Clamp to DAC range (0-255)
+        if (dac_val > 255.0f) dac_val = 255.0f;
+        if (dac_val < 0.0f) dac_val = 0.0f;
+        
+        uint8_t value = (uint8_t)dac_val;
         values[ch] = value;
     }
 
