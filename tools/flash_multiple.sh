@@ -1,12 +1,16 @@
 #!/bin/bash
-# Flash firmware to multiple ESP32 devices simultaneously
+# Build firmware and flash to multiple ESP32 devices simultaneously
 
 FIRMWARE_DIR="../firmware"
 DEVICES=("/dev/ttyUSB0" "/dev/ttyUSB1")
 
-echo "Flashing NHP_Synth firmware to multiple devices..."
+echo "Building NHP_Synth firmware..."
 
 cd "$FIRMWARE_DIR" || exit 1
+
+idf.py build || exit 1
+
+echo "Flashing NHP_Synth firmware to multiple devices..."
 
 # Flash each device
 for device in "${DEVICES[@]}"; do
