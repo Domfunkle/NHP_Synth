@@ -44,7 +44,7 @@ static uint8_t waveform_quarter_table[TABLE_SIZE / 4]; // Store only a quarter o
 static volatile float current_freq[2] = {50, 50}; // [A, B]
 static volatile float current_phase[2] = {0, 0};
 static volatile float current_ampl[2] = {0.0f, 0.0f}; // Used for output (ramped)
-static volatile float target_ampl[2] = {1.0f, 0.5f}; // Set by UART, ramped to
+static volatile float target_ampl[2] = {0.0f, 0.0f}; // Set by UART, ramped to
 
 static volatile uint32_t dds_acc[2] = {0, 0};
 static volatile uint32_t dds_step[2] = {1, 1};
@@ -102,8 +102,8 @@ static void dds_output(void);
 static void dds_timer_callback(void* arg);
 static void start_dds_timer(int64_t period_us);
 static void global_gpio_init(void);
-static void pause_dds_timer(void);
-static void resume_dds_timer(void);
+// static void pause_dds_timer(void);
+// static void resume_dds_timer(void);
 
 // Function Definitions
 static void generate_waveform(int table_size) {
@@ -420,17 +420,17 @@ static void global_gpio_init(void) {
     gpio_set_intr_type(GPIO_INPUT_PIN, GPIO_INTR_POSEDGE);
 }
 
-static void pause_dds_timer(void) {
-    if (dds_timer.handle) {
-        esp_timer_stop(dds_timer.handle);
-    }
-}
+// static void pause_dds_timer(void) {
+//     if (dds_timer.handle) {
+//         esp_timer_stop(dds_timer.handle);
+//     }
+// }
 
-static void resume_dds_timer(void) {
-    if (dds_timer.handle) {
-        esp_timer_start_periodic(dds_timer.handle, dds_timer.period_us);
-    }
-}
+// static void resume_dds_timer(void) {
+//     if (dds_timer.handle) {
+//         esp_timer_start_periodic(dds_timer.handle, dds_timer.period_us);
+//     }
+// }
 
 void app_main(void) {
     generate_waveform(TABLE_SIZE);
