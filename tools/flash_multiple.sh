@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build firmware and flash to multiple ESP32 devices simultaneously
 
-FIRMWARE_DIR="../firmware"
+FIRMWARE_DIR="${HOME}/NHP_Synth/firmware"
 DEVICES=("/dev/ttyUSB0" "/dev/ttyUSB1")
 
 echo "Building NHP_Synth firmware..."
