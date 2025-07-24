@@ -404,8 +404,8 @@ def main():
                                 print(f"Amplitude B: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%")
                                 
                             elif func == 'frequency':
-                                # Frequency: 1 step = 1Hz change for ALL synths and channels
-                                delta_val = delta * 1
+                                # Frequency: 1 step = 0.1Hz change for ALL synths and channels
+                                delta_val = delta * 0.1
                                 for i in range(num_synths):
                                     frequency_a[i] = max(20, min(8000, frequency_a[i] + delta_val))
                                     frequency_b[i] = max(20, min(8000, frequency_b[i] + delta_val))

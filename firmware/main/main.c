@@ -137,7 +137,7 @@ static uint8_t get_waveform_value(uint32_t idx) {
 static void update_dds_step(int ch, float frequency, float period_us) {
     dds_step[ch] = (TABLE_SIZE * frequency * period_us / 1000000);
     dds_phase_offset[ch] = (uint32_t)(current_phase[ch] * PHASE_SCALE);
-    // ESP_LOGI(TAG, "DDS step and phase offset updated for channel %d: step %lu, phase offset %lu for frequency %.2f Hz", 
+    // ESP_LOGI(TAG, "DDS step and phase offset updated for channel %d: step %lu, phase offset %lu for frequency %.1f Hz", 
     //          ch, dds_step[ch], dds_phase_offset[ch], frequency);
 }
 
@@ -172,9 +172,9 @@ static void uart_cmd_task(void *arg) {
                     if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
                         current_freq[ch_idx] = freq;
                         update_dds_step(ch_idx, current_freq[ch_idx], PERIOD_US);
-                        // ESP_LOGI(TAG, "UART: Set channel %c frequency to %f Hz", ch_idx == 0 ? 'A' : 'B', freq);
+                        // ESP_LOGI(TAG, "UART: Set channel %c frequency to %.1f Hz", ch_idx == 0 ? 'A' : 'B', freq);
                     } else {
-                        ESP_LOGW(TAG, "UART: Invalid channel %c frequency: %f (Allowed: %d-%d)", ch_idx == 0 ? 'A' : 'B', freq, MIN_FREQ, MAX_FREQ);
+                        ESP_LOGW(TAG, "UART: Invalid channel %c frequency: %.1f (Allowed: %d-%d)", ch_idx == 0 ? 'A' : 'B', freq, MIN_FREQ, MAX_FREQ);
                     }
                 // Unified phase command: wpa / wpb
                 } else if (strncmp(cmd_buf, "wp", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
@@ -268,7 +268,7 @@ static void uart_cmd_task(void *arg) {
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
                         "Commands:\r\n"
-                        "  wf[a|b]<freq>   Set channel A or B frequency in Hz (e.g. wfa1000, wfb1000)\r\n"
+                        "  wf[a|b]<freq>   Set channel A or B frequency in Hz (e.g. wfa1000.5, wfb50.1, decimals supported)\r\n"
                         "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -180 to +180)\r\n"
                         "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
                         "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
