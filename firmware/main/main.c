@@ -180,11 +180,11 @@ static void uart_cmd_task(void *arg) {
                 } else if (strncmp(cmd_buf, "wp", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float phase = strtof(cmd_buf + 3, NULL);
-                    if (phase < -180.0f || phase > 180.0f) {
-                        ESP_LOGW(TAG, "UART: Invalid channel %c phase: %f (Allowed: -180 to +180)", ch_idx == 0 ? 'A' : 'B', phase);
+                    if (phase < -360.0f || phase > 360.0f) {
+                        ESP_LOGW(TAG, "UART: Invalid channel %c phase: %f (Allowed: -360 to +360)", ch_idx == 0 ? 'A' : 'B', phase);
                     }
-                    if (phase < -180.0f) phase = -180.0f;
-                    if (phase > 180.0f) phase = 180.0f;
+                    if (phase < -360.0f) phase = -360.0f;
+                    if (phase > 360.0f) phase = 360.0f;
                     current_phase[ch_idx] = phase * M_PI_180;
                     // ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
                 // Unified amplitude command: waa / wab
@@ -269,7 +269,7 @@ static void uart_cmd_task(void *arg) {
                     const char *help_msg =
                         "Commands:\r\n"
                         "  wf[a|b]<freq>   Set channel A or B frequency in Hz (e.g. wfa1000.5, wfb50.1, decimals supported)\r\n"
-                        "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -180 to +180)\r\n"
+                        "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -360 to +360)\r\n"
                         "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
                         "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
                         "  whcl[a|b]         Remove all harmonics from channel A or B (e.g. whcla, whclb)\r\n"
