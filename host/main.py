@@ -21,7 +21,7 @@ from adafruit_seesaw import digitalio, neopixel
 
 # Set up logger
 logger = logging.getLogger("NHP_Synth")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(message)s')
 handler.setFormatter(formatter)
@@ -33,40 +33,42 @@ from synth_control import SynthStateManager, SystemInitializer, EncoderManager, 
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'synth_state.json')
 DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
 
-# Load per-synth DEFAULTS from defaults.json
-try:
-    with open(DEFAULTS_FILE, 'r') as f:
-        defaults_data = json.load(f)
-    if isinstance(defaults_data, dict) and 'synths' in defaults_data and isinstance(defaults_data['synths'], list):
-        DEFAULTS_LIST = defaults_data['synths']
-    elif isinstance(defaults_data, list):
-        DEFAULTS_LIST = defaults_data
-    else:
-        DEFAULTS_LIST = [defaults_data]
-except Exception as e:
-    DEFAULTS_LIST = [{
-        'amplitude_a': 100.0,
-        'amplitude_b': 50.0,
-        'frequency_a': 50.0,
-        'frequency_b': 50.0,
-        'phase_a': 0.0,
-        'phase_b': 0.0,
-        'harmonics_a': 0.0,
-        'harmonics_b': 0.0
-    }]
-
-# Instantiate SynthStateManager
-synth_state_manager = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
-get_default_for_synth = synth_state_manager.get_default_for_synth
-save_synth_state = synth_state_manager.save_synth_state
-load_synth_state = synth_state_manager.load_synth_state
-
-# Instantiate EncoderManager
-encoder_manager = EncoderManager(get_default_for_synth, save_synth_state)
-
 
 def main():
     """Main program for multi-encoder function-specific control"""
+
+    # Load per-synth DEFAULTS from defaults.json
+    try:
+        with open(DEFAULTS_FILE, 'r') as f:
+            defaults_data = json.load(f)
+        if isinstance(defaults_data, dict) and 'synths' in defaults_data and isinstance(defaults_data['synths'], list):
+            DEFAULTS_LIST = defaults_data['synths']
+        elif isinstance(defaults_data, list):
+            DEFAULTS_LIST = defaults_data
+        else:
+            DEFAULTS_LIST = [defaults_data]
+    except Exception as e:
+        DEFAULTS_LIST = [{
+            'amplitude_a': 100.0,
+            'amplitude_b': 50.0,
+            'frequency_a': 50.0,
+            'frequency_b': 50.0,
+            'phase_a': 0.0,
+            'phase_b': 0.0,
+            'harmonics_a': 0.0,
+            'harmonics_b': 0.0
+        }]
+
+    # Instantiate SynthStateManager
+    synth_state_manager = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
+    get_default_for_synth = synth_state_manager.get_default_for_synth
+    save_synth_state = synth_state_manager.save_synth_state
+    load_synth_state = synth_state_manager.load_synth_state
+
+    # Instantiate EncoderManager
+    encoder_manager = EncoderManager(get_default_for_synth, save_synth_state)
+
+
     try:
         # Initialize the complete system
         system = SystemInitializer.initialize_system(

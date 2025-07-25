@@ -17,7 +17,7 @@ firmware/sdkconfig.old
 host/__pycache__/
 host/*.egg-info/
 host/.pytest_cache/
-host/venv/
+host/.venv/
 **/__pycache__/
 *.pyc
 *.pyo
@@ -53,7 +53,7 @@ flasher_args.json
 *.launch
 *.code-workspace
 # Python virtualenv
-venv/
+.venv/
 .env/
 # Misc
 *.zip
