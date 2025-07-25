@@ -64,6 +64,7 @@ flasher_args.json
 *.7z
 *.rar
 .lgd-nfy0
+host/synth_state.json
 
 # Archive and backup
 *~
