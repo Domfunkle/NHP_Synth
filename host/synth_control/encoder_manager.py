@@ -115,6 +115,8 @@ class EncoderManager:
                         pixel.fill((255, 255, 255))
                         time.sleep(0.2)
                         pixel.fill(led_colors[func])
+                    
+                    self.save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b)
 
             elif button.value and button_pressed[func]:
                 hold_duration = time.time() - button_press_time[func]
