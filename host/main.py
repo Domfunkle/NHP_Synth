@@ -868,32 +868,34 @@ def handle_encoder_rotation(encoders, synths, last_positions, amplitude_a, ampli
                     for i in range(num_synths):
                         harmonics_a[i] = max(0, min(100, harmonics_a[i] + delta_val))
                         harmonics_b[i] = max(0, min(100, harmonics_b[i] + delta_val))
+                        # Channel A: add 3rd and 5th harmonic, 0 phase
+                        synths[i].clear_harmonics('a')
                         if harmonics_a[i] > 0:
+                            synths[i].add_harmonic('a', 3, harmonics_a[i])
                             synths[i].add_harmonic('a', 5, harmonics_a[i])
-                        else:
-                            synths[i].clear_harmonics('a')
+                        # Channel B: add 3rd and 5th harmonic, 180 phase
+                        synths[i].clear_harmonics('b')
                         if harmonics_b[i] > 0:
-                            synths[i].add_harmonic('b', 5, harmonics_b[i])
-                        else:
-                            synths[i].clear_harmonics('b')
-                    print(f"{Colors.HEADER}Harmonics: All synths/channels = {harmonics_a[0]:.0f}% (5th harmonic){Colors.END}")
+                            synths[i].add_harmonic('b', 3, harmonics_b[i], phase=180)
+                            synths[i].add_harmonic('b', 5, harmonics_b[i], phase=180)
+                    print(f"{Colors.HEADER}Harmonics: All synths/channels = {harmonics_a[0]:.0f}% (3rd & 5th){Colors.END}")
                 else:
                     synth_idx = active_synth[func]
                     channel = active_channel[func]
                     if channel == 'a':
                         harmonics_a[synth_idx] = max(0, min(100, harmonics_a[synth_idx] + delta_val))
+                        synths[synth_idx].clear_harmonics('a')
                         if harmonics_a[synth_idx] > 0:
+                            synths[synth_idx].add_harmonic('a', 3, harmonics_a[synth_idx])
                             synths[synth_idx].add_harmonic('a', 5, harmonics_a[synth_idx])
-                        else:
-                            synths[synth_idx].clear_harmonics('a')
-                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}% (5th harmonic){Colors.END}")
+                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}% (3rd & 5th){Colors.END}")
                     else:
                         harmonics_b[synth_idx] = max(0, min(100, harmonics_b[synth_idx] + delta_val))
+                        synths[synth_idx].clear_harmonics('b')
                         if harmonics_b[synth_idx] > 0:
-                            synths[synth_idx].add_harmonic('b', 5, harmonics_b[synth_idx])
-                        else:
-                            synths[synth_idx].clear_harmonics('b')
-                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}% (5th harmonic){Colors.END}")
+                            synths[synth_idx].add_harmonic('b', 3, harmonics_b[synth_idx], phase=180)
+                            synths[synth_idx].add_harmonic('b', 5, harmonics_b[synth_idx], phase=180)
+                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}% (3rd & 5th, 180° phase){Colors.END}")
                 changed = True
             last_positions[func] = position
             if changed:
