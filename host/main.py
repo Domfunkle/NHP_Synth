@@ -5,6 +5,7 @@ NHP_Synth Main Control Program
 I2C rotary encoder amplitude control interface for the ESP32 DDS synthesizer.
 """
 
+
 import time
 import json
 import os
@@ -16,20 +17,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from adafruit_seesaw.seesaw import Seesaw
 from adafruit_seesaw.rotaryio import IncrementalEncoder
 from adafruit_seesaw import digitalio, neopixel
-from synth_control import SynthInterface
+from synth_control import SynthInterface, SynthStateManager
+
 
 
 # Path for persistent synth state
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'synth_state.json')
-
-
+DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
 
 # Load per-synth DEFAULTS from defaults.json
-DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
 try:
     with open(DEFAULTS_FILE, 'r') as f:
         defaults_data = json.load(f)
-    # If file contains a list, use as per-synth defaults
     if isinstance(defaults_data, dict) and 'synths' in defaults_data and isinstance(defaults_data['synths'], list):
         DEFAULTS_LIST = defaults_data['synths']
     elif isinstance(defaults_data, list):
@@ -37,7 +36,6 @@ try:
     else:
         DEFAULTS_LIST = [defaults_data]
 except Exception as e:
-    print(f"{Colors.RED}Warning: Could not load defaults.json: {e}{Colors.END}")
     DEFAULTS_LIST = [{
         'amplitude_a': 100.0,
         'amplitude_b': 50.0,
@@ -49,52 +47,11 @@ except Exception as e:
         'harmonics_b': 0.0
     }]
 
-def get_default_for_synth(idx, key):
-    if idx < len(DEFAULTS_LIST):
-        return DEFAULTS_LIST[idx].get(key, DEFAULTS_LIST[0].get(key, 0.0))
-    return DEFAULTS_LIST[0].get(key, 0.0)
-
-def save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b):
-    """Save synth/channel values to JSON file"""
-    # Store state as a list of dicts, one per synth
-    state = []
-    for i in range(num_synths):
-        synth_state = {
-            'amplitude_a': round(float(amplitude_a[i]), 2),
-            'amplitude_b': round(float(amplitude_b[i]), 2),
-            'frequency_a': round(float(frequency_a[i]), 2),
-            'frequency_b': round(float(frequency_b[i]), 2),
-            'phase_a': round(float(phase_a[i]), 2),
-            'phase_b': round(float(phase_b[i]), 2),
-            'harmonics_a': harmonics_a[i],  # list of dicts
-            'harmonics_b': harmonics_b[i]   # list of dicts
-        }
-        state.append(synth_state)
-    try:
-        with open(STATE_FILE, 'w') as f:
-            json.dump({'num_synths': num_synths, 'synths': state}, f, indent=2)
-    except Exception as e:
-        print(f"Warning: Could not save synth state: {e}")
-
-def load_synth_state():
-    """Load synth/channel values from JSON file, or return None if not found"""
-    if not os.path.exists(STATE_FILE):
-        return None
-    try:
-        with open(STATE_FILE, 'r') as f:
-            state = json.load(f)
-        # Return None if structure is not as expected
-        if 'num_synths' not in state or 'synths' not in state:
-            return None
-        # Ensure harmonics_a/b are lists of dicts
-        for synth in state['synths']:
-            for key in ['harmonics_a', 'harmonics_b']:
-                if key not in synth or not isinstance(synth[key], list):
-                    synth[key] = []
-        return state
-    except Exception as e:
-        print(f"Warning: Could not load synth state: {e}")
-        return None
+# Instantiate SynthStateManager
+synth_state_manager = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
+get_default_for_synth = synth_state_manager.get_default_for_synth
+save_synth_state = synth_state_manager.save_synth_state
+load_synth_state = synth_state_manager.load_synth_state
 
 # ANSI color codes for console output
 class Colors:

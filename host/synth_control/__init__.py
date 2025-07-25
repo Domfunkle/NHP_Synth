@@ -10,5 +10,6 @@ __author__ = "Daniel Nathanson"
 
 from .uart_interface import SynthInterface
 from .waveform_generator import WaveformGenerator
+from .synth_state import SynthStateManager
 
-__all__ = ['SynthInterface', 'WaveformGenerator']
+__all__ = ['SynthInterface', 'WaveformGenerator', 'SynthStateManager']
