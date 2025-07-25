@@ -224,7 +224,7 @@ def initialize_system():
     print(f"{Colors.BOLD}{Colors.HEADER}NHP_Synth Multi-Encoder Function Control - Starting up...{Colors.END}")
     print(f"{Colors.CYAN}Initialization started at: {time.strftime('%H:%M:%S', time.localtime(init_start_time))}{Colors.END}")
     print(f"{Colors.BLUE}Step 1/3: Connecting to I2C rotary encoders...{Colors.END}")
-    
+
     # Define encoder configurations
     encoder_configs = [
         {'addr': 0x36, 'name': 'Amplitude A', 'function': 'amplitude_a'},
@@ -233,13 +233,13 @@ def initialize_system():
         {'addr': 0x39, 'name': 'Phase', 'function': 'phase'},
         {'addr': 0x3a, 'name': 'Harmonics', 'function': 'harmonics'}
     ]
-    
+
     # Pre-create dummy objects for missing components (faster than creating them in loop)
     class DummyButton:
         @property
         def value(self):
             return True  # Always "not pressed"
-    
+
     class DummyPixel:
         def fill(self, color):
             pass
@@ -249,14 +249,14 @@ def initialize_system():
         @brightness.setter
         def brightness(self, value):
             pass
-    
+
     dummy_button = DummyButton()
     dummy_pixel = DummyPixel()
-    
+
     # Initialize I2C and rotary encoders
     try:
         i2c = busio.I2C(board.SCL, board.SDA)
-        
+
         # Do a single I2C scan upfront instead of per-device
         print(f"{Colors.CYAN}  → Scanning I2C bus for devices...{Colors.END}")
         available_addresses = set()
@@ -271,16 +271,16 @@ def initialize_system():
                 print(f"{Colors.YELLOW}  → No I2C devices found{Colors.END}")
         except Exception as e:
             print(f"{Colors.YELLOW}  → I2C scan failed: {e}, proceeding with individual checks{Colors.END}")
-        
+
         # Initialize all encoders
         encoders = {}
         buttons = {}
         pixels = {}
-        
+
         # Try concurrent initialization if we have multiple encoders to speed things up
         present_configs = [config for config in encoder_configs 
                           if not available_addresses or config['addr'] in available_addresses]
-        
+
         if len(present_configs) > 1:
             print(f"{Colors.CYAN}  → Initializing {len(present_configs)} encoders concurrently...{Colors.END}")
             # Use ThreadPoolExecutor for concurrent initialization
@@ -290,7 +290,7 @@ def initialize_system():
                     executor.submit(init_single_encoder, config, i2c, available_addresses): config 
                     for config in present_configs
                 }
-                
+
                 # Collect results as they complete
                 for future in as_completed(future_to_config):
                     function, encoder, button, pixel, status = future.result()
@@ -298,7 +298,7 @@ def initialize_system():
                     buttons[function] = button
                     pixels[function] = pixel
                     print(f"{Colors.GREEN}    ✓ {status}{Colors.END}")
-            
+
             # Handle missing encoders
             missing_count = 0
             for config in encoder_configs:
@@ -308,7 +308,7 @@ def initialize_system():
                     buttons[func] = None
                     pixels[func] = None
                     missing_count += 1
-            
+
             if missing_count > 0:
                 print(f"{Colors.YELLOW}    - {missing_count} encoder(s) not found{Colors.END}")
         else:
@@ -323,32 +323,32 @@ def initialize_system():
                     print(f"{Colors.GREEN}    ✓ {status}{Colors.END}")
                 else:
                     print(f"{Colors.RED}    ✗ {status}{Colors.END}")
-        
+
         # Replace None buttons and pixels with dummy objects
         for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
             if buttons[func] is None:
                 buttons[func] = dummy_button
             if pixels[func] is None:
                 pixels[func] = dummy_pixel
-        
+
         print(f"{Colors.CYAN}  → Encoder initialization complete{Colors.END}")
-        
+
         step1_end_time = time.time()
         step1_duration = step1_end_time - init_start_time
         print(f"{Colors.GREEN}✓ Step 1 completed in {step1_duration:.2f} seconds{Colors.END}")
-        
+
     except Exception as e:
         print(f"{Colors.RED}✗ Failed to connect to rotary encoder: {e}{Colors.END}")
         print(f"{Colors.YELLOW}  Make sure the I2C rotary encoder is connected and powered{Colors.END}")
         raise
-    
+
     step2_start_time = time.time()
     print(f"\n{Colors.BLUE}Step 2/3: Connecting to synthesizer...{Colors.END}")
-    
+
     try:
         device_paths = find_all_synth_devices()
         print(f"{Colors.GREEN}  → Found {len(device_paths)} synthesizer(s){Colors.END}")
-        
+
         # Open connections to all synthesizers
         print(f"{Colors.CYAN}  → Establishing connections...{Colors.END}")
         synths = []
@@ -362,20 +362,32 @@ def initialize_system():
             except Exception as e:
                 device_name = device_path.split('/')[-1]
                 print(f"{Colors.RED}    ✗ Failed to connect to {device_name}: {e}{Colors.END}")
-        
+
         if not synths:
             raise Exception("No synthesizers could be connected")
-        
+
         step2_end_time = time.time()
         step2_duration = step2_end_time - step2_start_time
         print(f"{Colors.GREEN}✓ Step 2 completed in {step2_duration:.2f} seconds{Colors.END}")
-        
+
         step3_start_time = time.time()
         print(f"\n{Colors.BLUE}Step 3/3: Initializing control system...{Colors.END}")
-                
 
         # Try to load persistent state
         num_synths = len(synths)
+
+        # If synth_state.json does not exist, create it with defaults
+        if not os.path.exists(STATE_FILE):
+            amplitude_a = [get_default_for_synth(i, 'amplitude_a') for i in range(num_synths)]
+            amplitude_b = [get_default_for_synth(i, 'amplitude_b') for i in range(num_synths)]
+            frequency_a = [get_default_for_synth(i, 'frequency_a') for i in range(num_synths)]
+            frequency_b = [get_default_for_synth(i, 'frequency_b') for i in range(num_synths)]
+            phase_a = [get_default_for_synth(i, 'phase_a') for i in range(num_synths)]
+            phase_b = [get_default_for_synth(i, 'phase_b') for i in range(num_synths)]
+            harmonics_a = [[] for _ in range(num_synths)]
+            harmonics_b = [[] for _ in range(num_synths)]
+            save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b)
+
         state = load_synth_state()
         if state and state.get('num_synths', num_synths) == num_synths and isinstance(state.get('synths'), list):
             synth_states = state['synths']
