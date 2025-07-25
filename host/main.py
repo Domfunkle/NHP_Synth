@@ -53,66 +53,6 @@ get_default_for_synth = synth_state_manager.get_default_for_synth
 save_synth_state = synth_state_manager.save_synth_state
 load_synth_state = synth_state_manager.load_synth_state
 
-
-def init_single_encoder(config, i2c, available_addresses):
-    """Initialize a single encoder - designed for concurrent execution"""
-    addr = config['addr']
-    name = config['name']
-    function = config['function']
-    
-    # Quick check against cached scan results
-    if available_addresses and addr not in available_addresses:
-        return function, None, None, None, f"No device at 0x{addr:02x} ({name}) - skipping"
-    
-    seesaw = None
-    # Attempt connection with minimal retries
-    for attempt in range(1 if available_addresses else 2):
-        try:
-            if attempt > 0:
-                time.sleep(0.1)
-            seesaw = Seesaw(i2c, addr=addr)
-            break
-        except:
-            if attempt == 0 and not available_addresses:
-                time.sleep(0.1)
-            continue
-    
-    if seesaw is None:
-        return function, None, None, None, f"{name} at 0x{addr:02x} failed"
-    
-    # Initialize components
-    encoder = None
-    button = None
-    pixel = None
-    components = []
-    
-    try:
-        encoder = IncrementalEncoder(seesaw)
-        encoder.position  # Cache initial position
-        components.append("encoder")
-    except:
-        pass
-    
-    try:
-        seesaw.pin_mode(24, seesaw.INPUT_PULLUP)
-        button = digitalio.DigitalIO(seesaw, 24)
-        components.append("button")
-    except:
-        pass
-    
-    try:
-        pixel = neopixel.NeoPixel(seesaw, 6, 1)
-        pixel.brightness = 0.5
-        components.append("LED")
-    except:
-        pass
-    
-    status = f"{name}: {', '.join(components) if components else 'no components'}"
-    return function, encoder, button, pixel, status
-
-
-
-
 def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, button_press_time, 
                           hold_threshold, led_colors, amplitude_a, amplitude_b, 
                           frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
