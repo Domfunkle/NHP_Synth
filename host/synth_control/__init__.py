@@ -13,6 +13,7 @@ from .waveform_generator import WaveformGenerator
 from .synth_state import SynthStateManager
 from .synth_discovery import SynthDiscovery
 from .system_initializer import SystemInitializer
+from .encoder_manager import EncoderManager
 from .utils import Colors
 
-__all__ = ['SynthInterface', 'WaveformGenerator', 'SynthStateManager', 'SynthDiscovery', 'SystemInitializer', 'Colors', ]
+__all__ = ['SynthInterface', 'WaveformGenerator', 'SynthStateManager', 'SynthDiscovery', 'SystemInitializer', 'EncoderManager', 'Colors', ]
