@@ -63,6 +63,8 @@ venv/
 *.gz
 *.7z
 *.rar
+.lgd-nfy0
+
 # Archive and backup
 *~
 # Ignore generated documentation
