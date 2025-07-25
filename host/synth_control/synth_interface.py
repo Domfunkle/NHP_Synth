@@ -7,7 +7,8 @@ Provides a Python interface to control the ESP32 synthesizer via UART commands.
 import serial
 import time
 from typing import Optional, Union
-
+import logging
+logger = logging.getLogger("NHP_Synth")
 
 class SynthInterface:
     """Interface to control NHP_Synth via UART"""
@@ -36,7 +37,7 @@ class SynthInterface:
             time.sleep(0.1)  # Allow time for connection
             return True
         except Exception as e:
-            print(f"Failed to connect: {e}")
+            logger.error(f"Failed to connect: {e}")
             return False
             
     def disconnect(self):
@@ -55,14 +56,14 @@ class SynthInterface:
             True if command sent successfully
         """
         if not self.ser or not self.ser.is_open:
-            print("Not connected to synthesizer")
+            logger.error("Not connected to synthesizer")
             return False
-            
+
         try:
             self.ser.write(f"{command}\r".encode())
             return True
         except Exception as e:
-            print(f"Failed to send command: {e}")
+            logger.error(f"Failed to send command: {e}")
             return False
             
     def set_frequency(self, channel: str, frequency: float) -> bool:

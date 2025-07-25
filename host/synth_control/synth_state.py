@@ -1,5 +1,7 @@
 import os
 import json
+import logging
+logger = logging.getLogger("NHP_Synth")
 
 class SynthStateManager:
     def __init__(self, state_file, defaults_list):
@@ -30,7 +32,7 @@ class SynthStateManager:
             with open(self.state_file, 'w') as f:
                 json.dump({'num_synths': num_synths, 'synths': state}, f, indent=2)
         except Exception as e:
-            print(f"Warning: Could not save synth state: {e}")
+            logger.warning(f"Could not save synth state: {e}")
 
     def load_synth_state(self):
         """Load synth/channel values from JSON file, or return None if not found"""
@@ -47,5 +49,5 @@ class SynthStateManager:
                         synth[key] = []
             return state
         except Exception as e:
-            print(f"Warning: Could not load synth state: {e}")
+            logger.warning(f"Could not load synth state: {e}")
             return None

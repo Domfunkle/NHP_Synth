@@ -9,7 +9,8 @@ from adafruit_seesaw import digitalio, neopixel
 from .synth_interface import SynthInterface
 from .synth_state import SynthStateManager
 from .synth_discovery import SynthDiscovery
-from .utils import Colors
+import logging
+logger = logging.getLogger("NHP_Synth")
 
 class SystemInitializer:
     """
@@ -20,9 +21,10 @@ class SystemInitializer:
         # The full code of initialize_system from main.py, with references to globals replaced by arguments.
 
         init_start_time = time.time()
-        print(f"{Colors.BOLD}{Colors.HEADER}NHP_Synth Multi-Encoder Function Control - Starting up...{Colors.END}")
-        print(f"{Colors.CYAN}Initialization started at: {time.strftime('%H:%M:%S', time.localtime(init_start_time))}{Colors.END}")
-        print(f"{Colors.BLUE}Step 1/3: Connecting to I2C rotary encoders...{Colors.END}")
+        logger.info("=" * 60)
+        logger.info(" NHP_Synth Initialization ".center(60))
+        logger.info("=" * 60)
+        logger.info("[Step 1/3] Connecting to I2C rotary encoders...")
 
         encoder_configs = [
             {'addr': 0x36, 'name': 'Amplitude A', 'function': 'amplitude_a'},
@@ -52,7 +54,7 @@ class SystemInitializer:
 
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
-            print(f"{Colors.CYAN}  → Scanning I2C bus for devices...{Colors.END}")
+            logger.info("Scanning I2C bus for devices...")
             available_addresses = set()
             try:
                 i2c.try_lock()
@@ -60,11 +62,11 @@ class SystemInitializer:
                 i2c.unlock()
                 if available_addresses:
                     addr_list = [f"0x{addr:02x}" for addr in sorted(available_addresses)]
-                    print(f"{Colors.GREEN}  → Found I2C devices: {', '.join(addr_list)}{Colors.END}")
+                    logger.info(f"Found I2C devices: {', '.join(addr_list)}")
                 else:
-                    print(f"{Colors.YELLOW}  → No I2C devices found{Colors.END}")
+                    logger.warning("No I2C devices found")
             except Exception as e:
-                print(f"{Colors.YELLOW}  → I2C scan failed: {e}, proceeding with individual checks{Colors.END}")
+                logger.warning(f"I2C scan failed: {e}, proceeding with individual checks")
 
             encoders = {}
             buttons = {}
@@ -116,7 +118,7 @@ class SystemInitializer:
                 return function, encoder, button, pixel, status
 
             if len(present_configs) > 1:
-                print(f"{Colors.CYAN}  → Initializing {len(present_configs)} encoders concurrently...{Colors.END}")
+                logger.info(f"Initializing {len(present_configs)} encoders concurrently...")
                 with ThreadPoolExecutor(max_workers=3) as executor:
                     future_to_config = {
                         executor.submit(init_single_encoder, config, i2c, available_addresses): config 
@@ -127,7 +129,7 @@ class SystemInitializer:
                         encoders[function] = encoder
                         buttons[function] = button
                         pixels[function] = pixel
-                        print(f"{Colors.GREEN}    ✓ {status}{Colors.END}")
+                        logger.info(f"✓ {status}")
                 missing_count = 0
                 for config in encoder_configs:
                     if config not in present_configs:
@@ -137,38 +139,37 @@ class SystemInitializer:
                         pixels[func] = None
                         missing_count += 1
                 if missing_count > 0:
-                    print(f"{Colors.YELLOW}    - {missing_count} encoder(s) not found{Colors.END}")
+                    logger.warning(f"- {missing_count} encoder(s) not found")
             else:
-                print(f"{Colors.CYAN}  → Initializing encoders sequentially...{Colors.END}")
+                logger.info("Initializing encoders sequentially...")
                 for config in encoder_configs:
                     function, encoder, button, pixel, status = init_single_encoder(config, i2c, available_addresses)
                     encoders[function] = encoder
                     buttons[function] = button
                     pixels[function] = pixel
                     if encoder is not None or "skipping" in status:
-                        print(f"{Colors.GREEN}    ✓ {status}{Colors.END}")
+                        logger.info(f"✓ {status}")
                     else:
-                        print(f"{Colors.RED}    ✗ {status}{Colors.END}")
+                        logger.error(f"✗ {status}")
             for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
                 if buttons[func] is None:
                     buttons[func] = dummy_button
                 if pixels[func] is None:
                     pixels[func] = dummy_pixel
-            print(f"{Colors.CYAN}  → Encoder initialization complete{Colors.END}")
+            logger.info("✓ Encoders initialized")
             step1_end_time = time.time()
             step1_duration = step1_end_time - init_start_time
-            print(f"{Colors.GREEN}✓ Step 1 completed in {step1_duration:.2f} seconds{Colors.END}")
+            logger.info(f"[Step 1/3] Done in {step1_duration:.2f}s")
         except Exception as e:
-            print(f"{Colors.RED}✗ Failed to connect to rotary encoder: {e}{Colors.END}")
-            print(f"{Colors.YELLOW}  Make sure the I2C rotary encoder is connected and powered{Colors.END}")
+            logger.error(f"✗ Failed to connect to rotary encoder: {e}")
+            logger.warning("Make sure the I2C rotary encoder is connected and powered")
             raise
 
         step2_start_time = time.time()
-        print(f"\n{Colors.BLUE}Step 2/3: Connecting to synthesizer...{Colors.END}")
+        logger.info("[Step 2/3] Connecting to synthesizer...")
         try:
             device_paths = SynthDiscovery.find_all_synth_devices()
-            print(f"{Colors.GREEN}  → Found {len(device_paths)} synthesizer(s){Colors.END}")
-            print(f"{Colors.CYAN}  → Establishing connections...{Colors.END}")
+            logger.info(f"Found {len(device_paths)} synthesizer(s)")
             synths = []
             for i, device_path in enumerate(device_paths):
                 try:
@@ -176,17 +177,17 @@ class SystemInitializer:
                     synth.__enter__()
                     synths.append(synth)
                     device_name = device_path.split('/')[-1]
-                    print(f"{Colors.GREEN}    ✓ Synth {i+1}: {device_name}{Colors.END}")
+                    logger.info(f"✓ Synth {i+1}: {device_name}")
                 except Exception as e:
                     device_name = device_path.split('/')[-1]
-                    print(f"{Colors.RED}    ✗ Failed to connect to {device_name}: {e}{Colors.END}")
+                    logger.error(f"✗ Failed to connect to {device_name}: {e}")
             if not synths:
                 raise Exception("No synthesizers could be connected")
             step2_end_time = time.time()
             step2_duration = step2_end_time - step2_start_time
-            print(f"{Colors.GREEN}✓ Step 2 completed in {step2_duration:.2f} seconds{Colors.END}")
+            logger.info(f"[Step 2/3] Done in {step2_duration:.2f}s")
             step3_start_time = time.time()
-            print(f"\n{Colors.BLUE}Step 3/3: Initializing control system...{Colors.END}")
+            logger.info("[Step 3/3] Initializing control system...")
             num_synths = len(synths)
             if not os.path.exists(STATE_FILE):
                 amplitude_a = [get_default_for_synth(i, 'amplitude_a') for i in range(num_synths)]
@@ -209,7 +210,7 @@ class SystemInitializer:
                 phase_b = [s.get('phase_b', get_default_for_synth(i, 'phase_b')) for i, s in enumerate(synth_states)]
                 harmonics_a = [s.get('harmonics_a', []) for s in synth_states]
                 harmonics_b = [s.get('harmonics_b', []) for s in synth_states]
-                print(f"{Colors.YELLOW}Loaded synth state from {STATE_FILE}{Colors.END}")
+                logger.info(f"Loaded synth state from {STATE_FILE}")
             else:
                 amplitude_a = [get_default_for_synth(i, 'amplitude_a') for i in range(num_synths)]
                 amplitude_b = [get_default_for_synth(i, 'amplitude_b') for i in range(num_synths)]
@@ -255,7 +256,7 @@ class SystemInitializer:
                     last_positions[func] = encoders[func].position
                 else:
                     last_positions[func] = 0
-            print(f"{Colors.CYAN}  → Setting initial values on synthesizers...{Colors.END}")
+            logger.info("Setting initial values on synthesizers...")
             for i, synth in enumerate(synths):
                 try:
                     amp_a = round(float(amplitude_a[i]), 2)
@@ -270,9 +271,8 @@ class SystemInitializer:
                     synth.set_frequency('b', freq_b)
                     synth.set_phase('a', ph_a)
                     synth.set_phase('b', ph_b)
-                    print(f"{Colors.GREEN}    ✓ Synth {i + 1} configured{Colors.END}")
                 except Exception as e:
-                    print(f"{Colors.YELLOW}    ✗ Synth {i + 1} warning: {e}{Colors.END}")
+                    logger.warning(f"Synth {i + 1} warning: {e}")
             led_colors = {
                 'amplitude_a': (255, 0, 0),
                 'amplitude_b': (255, 165, 0),
@@ -286,60 +286,12 @@ class SystemInitializer:
                         pixel.fill(led_colors[func])
                     except:
                         pass
-            print(f"{Colors.CYAN}  → LED colors configured{Colors.END}")
             step3_end_time = time.time()
             step3_duration = step3_end_time - step3_start_time
             total_init_time = step3_end_time - init_start_time
-            print(f"{Colors.GREEN}✓ Step 3 completed in {step3_duration:.2f} seconds{Colors.END}")
-            print(f"\n{Colors.BOLD}" + "="*60 + f"{Colors.END}")
-            print(f"{Colors.BOLD}{Colors.HEADER}INITIALIZATION COMPLETE{Colors.END}")
-            print(f"{Colors.BOLD}" + "="*60 + f"{Colors.END}")
-            print(f"{Colors.CYAN}Started: {time.strftime('%H:%M:%S', time.localtime(init_start_time))}{Colors.END}")
-            print(f"{Colors.CYAN}Finished: {time.strftime('%H:%M:%S', time.localtime(step3_end_time))}{Colors.END}")
-            print(f"{Colors.YELLOW}Timing Breakdown:{Colors.END}")
-            print(f"   {Colors.BLUE}Step 1 (I2C Encoders): {step1_duration:.2f}s{Colors.END}")
-            print(f"   {Colors.BLUE}Step 2 (USB Synthesizers): {step2_duration:.2f}s{Colors.END}")
-            print(f"   {Colors.BLUE}Step 3 (Control System): {step3_duration:.2f}s{Colors.END}")
-            print(f"{Colors.BOLD}{Colors.GREEN}Total initialization time: {total_init_time:.2f} seconds{Colors.END}")
-            working_encoders = 0
-            working_buttons = 0
-            working_leds = 0
-            for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
-                if encoders[func] is not None:
-                    working_encoders += 1
-                if buttons[func] is not dummy_button:
-                    working_buttons += 1
-                if pixels[func] is not dummy_pixel:
-                    working_leds += 1
-            print(f"{Colors.BOLD}{Colors.CYAN}Hardware Status:{Colors.END}")
-            print(f"   Synthesizers: {Colors.GREEN}{len(synths)}/{len(device_paths)} connected{Colors.END}")
-            print(f"   Encoders: {Colors.GREEN}{working_encoders}/5 working{Colors.END}")
-            print(f"   Buttons: {Colors.GREEN}{working_buttons}/5 working{Colors.END}")
-            print(f"   LEDs: {Colors.GREEN}{working_leds}/5 working{Colors.END}")
-            print(f"\n{Colors.BOLD}{Colors.ORANGE}Control Configuration:{Colors.END}")
-            print(f"   Controlling {Colors.YELLOW}{num_synths}{Colors.END} synthesizer(s)")
-            print(f"   {Colors.RED}0x36 - Amplitude A (all synths by default, button for individual){Colors.END}")
-            print(f"   {Colors.ORANGE}0x37 - Amplitude B (all synths by default, button for individual){Colors.END}")
-            print(f"   {Colors.GREEN}0x38 - Frequency (all synths simultaneously){Colors.END}")
-            print(f"   {Colors.BLUE}0x39 - Phase (all synths by default, button for individual){Colors.END}")
-            print(f"   {Colors.HEADER}0x3a - Harmonics (all synths by default, button for individual){Colors.END}")
-            print(f"\n{Colors.BOLD}{Colors.YELLOW}Current Settings:{Colors.END}")
-            def harmonics_summary(hlist):
-                if not hlist:
-                    return "0%"
-                return ", ".join(f"{h['order']}:{h['amplitude']}%/{h['phase']}°" for h in hlist)
-            for i in range(num_synths):
-                print(f"   {Colors.CYAN}Synth {i + 1} - Ch A: {Colors.RED}Amp={amplitude_a[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_a[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_a[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm=[{harmonics_summary(harmonics_a[i])}]{Colors.END}")
-                print(f"   {Colors.CYAN}Synth {i + 1} - Ch B: {Colors.ORANGE}Amp={amplitude_b[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_b[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_b[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm=[{harmonics_summary(harmonics_b[i])}]{Colors.END}")
-            print(f"\n{Colors.BOLD}{Colors.YELLOW}Usage Instructions:{Colors.END}")
-            print(f"   • {Colors.CYAN}Default Mode{Colors.END}: All encoders affect all synths simultaneously")
-            print(f"   • {Colors.RED}Amplitude A/B{Colors.END}: Press button to select individual synth (60s timeout)")
-            print(f"   • {Colors.GREEN}Frequency{Colors.END}: Always controls all synths together")
-            print(f"   • {Colors.BLUE}Phase{Colors.END}: Default controls all synths Ch B, press to select individual synth/channel (60s timeout)")
-            print(f"   • {Colors.HEADER}Harmonics{Colors.END}: Press to select individual synth/channel (60s timeout)")
-            print(f"   • {Colors.YELLOW}Hold button{Colors.END}: Reset parameter to default value")
-            print(f"   • Press {Colors.BOLD}Ctrl+C{Colors.END} to exit")
-            print(f"{Colors.BOLD}" + "="*60 + f"{Colors.END}")
+            logger.info(f"[Step 3/3] Done in {step3_duration:.2f}s")
+            logger.info(f"✓ Initialization complete in {total_init_time:.2f}s.")
+            logger.info("-" * 60)
             return {
                 'encoders': encoders,
                 'buttons': buttons,
