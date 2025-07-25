@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from adafruit_seesaw.seesaw import Seesaw
 from adafruit_seesaw.rotaryio import IncrementalEncoder
 from adafruit_seesaw import digitalio, neopixel
-from synth_control import SynthInterface, SynthStateManager
+from synth_control import SynthInterface, SynthStateManager, SynthDiscovery, Colors
 
 
 
@@ -52,19 +52,6 @@ synth_state_manager = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
 get_default_for_synth = synth_state_manager.get_default_for_synth
 save_synth_state = synth_state_manager.save_synth_state
 load_synth_state = synth_state_manager.load_synth_state
-
-# ANSI color codes for console output
-class Colors:
-    HEADER = '\033[95m'     # Magenta
-    BLUE = '\033[94m'       # Blue
-    CYAN = '\033[96m'       # Cyan
-    GREEN = '\033[92m'      # Green
-    YELLOW = '\033[93m'     # Yellow
-    RED = '\033[91m'        # Red
-    ORANGE = '\033[38;5;208m'  # Orange
-    BOLD = '\033[1m'        # Bold
-    UNDERLINE = '\033[4m'   # Underline
-    END = '\033[0m'         # Reset to default
 
 
 def init_single_encoder(config, i2c, available_addresses):
@@ -122,57 +109,6 @@ def init_single_encoder(config, i2c, available_addresses):
     
     status = f"{name}: {', '.join(components) if components else 'no components'}"
     return function, encoder, button, pixel, status
-
-
-def find_all_synth_devices():
-    """Find all synthesizer USB devices automatically using by-path"""
-    synth_devices = []
-    
-    # First try by-path devices (more reliable)
-    path_devices = glob.glob('/dev/serial/by-path/*')
-    
-    # Filter for likely USB serial devices to reduce scan time
-    # Look for common ESP32/Arduino USB-to-serial chips
-    usb_devices = []
-    priority_keywords = ['usb', 'esp', 'arduino', 'ch34', 'cp210', 'ftdi']
-    
-    # First pass: prioritize devices with known keywords
-    for device in path_devices:
-        device_lower = device.lower()
-        if any(keyword in device_lower for keyword in priority_keywords):
-            usb_devices.append(device)
-    
-    # Second pass: add remaining USB devices if needed
-    if not usb_devices:
-        usb_devices = [d for d in path_devices if 'usb' in d.lower()]
-    
-    # Fall back to all devices if nothing found
-    if not usb_devices:
-        usb_devices = path_devices
-    
-    print(f"  → Scanning {len(usb_devices)} potential devices...")
-    
-    # Quick scan - try devices in order, but stop at first success for speed
-    for i, device in enumerate(usb_devices):
-        try:
-            device_name = device.split('/')[-1]  # Get just the filename for cleaner output
-            print(f"    [{i+1}/{len(usb_devices)}] Trying: {device_name}")
-            # Quick test to see if it responds
-            with SynthInterface(device) as synth:
-                synth_devices.append(device)
-                print(f"      {Colors.GREEN}✓ Found synthesizer{Colors.END}")
-                # Continue scanning for multiple devices rather than stopping
-        except Exception as e:
-            # Don't print every failure to reduce console spam
-            continue
-    
-    if not synth_devices:
-        print(f"  {Colors.RED}✗ No synthesizers found. Tried devices:{Colors.END}")
-        for device in usb_devices:
-            print(f"      - {device.split('/')[-1]}")
-        raise Exception("No synthesizers found on any USB port")
-    
-    return synth_devices
 
 
 def initialize_system():
@@ -303,7 +239,7 @@ def initialize_system():
     print(f"\n{Colors.BLUE}Step 2/3: Connecting to synthesizer...{Colors.END}")
 
     try:
-        device_paths = find_all_synth_devices()
+        device_paths = SynthDiscovery.find_all_synth_devices()
         print(f"{Colors.GREEN}  → Found {len(device_paths)} synthesizer(s){Colors.END}")
 
         # Open connections to all synthesizers

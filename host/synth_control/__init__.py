@@ -1,3 +1,4 @@
+
 """
 NHP Synth Control Library
 
@@ -11,5 +12,7 @@ __author__ = "Daniel Nathanson"
 from .uart_interface import SynthInterface
 from .waveform_generator import WaveformGenerator
 from .synth_state import SynthStateManager
+from .synth_discovery import SynthDiscovery
+from .utils import Colors
 
-__all__ = ['SynthInterface', 'WaveformGenerator', 'SynthStateManager']
+__all__ = ['SynthInterface', 'WaveformGenerator', 'SynthStateManager', 'Colors', 'SynthDiscovery']
