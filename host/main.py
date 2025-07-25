@@ -6,6 +6,8 @@ I2C rotary encoder amplitude control interface for the ESP32 DDS synthesizer.
 """
 
 import time
+import json
+import os
 import board
 import busio
 import glob
@@ -15,6 +17,76 @@ from adafruit_seesaw.seesaw import Seesaw
 from adafruit_seesaw.rotaryio import IncrementalEncoder
 from adafruit_seesaw import digitalio, neopixel
 from synth_control import SynthInterface
+
+
+# Path for persistent synth state
+STATE_FILE = os.path.join(os.path.dirname(__file__), 'synth_state.json')
+
+
+
+# Load per-synth DEFAULTS from defaults.json
+DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
+try:
+    with open(DEFAULTS_FILE, 'r') as f:
+        defaults_data = json.load(f)
+    # If file contains a list, use as per-synth defaults
+    if isinstance(defaults_data, dict) and 'synths' in defaults_data and isinstance(defaults_data['synths'], list):
+        DEFAULTS_LIST = defaults_data['synths']
+    elif isinstance(defaults_data, list):
+        DEFAULTS_LIST = defaults_data
+    else:
+        DEFAULTS_LIST = [defaults_data]
+except Exception as e:
+    print(f"{Colors.RED}Warning: Could not load defaults.json: {e}{Colors.END}")
+    DEFAULTS_LIST = [{
+        'amplitude_a': 100.0,
+        'amplitude_b': 50.0,
+        'frequency': 50.0,
+        'phase': 0.0,
+        'harmonics': 0.0
+    }]
+
+def get_default_for_synth(idx, key):
+    if idx < len(DEFAULTS_LIST):
+        return DEFAULTS_LIST[idx].get(key, DEFAULTS_LIST[0].get(key, 0.0))
+    return DEFAULTS_LIST[0].get(key, 0.0)
+
+def save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b):
+    """Save synth/channel values to JSON file"""
+    # Store state as a list of dicts, one per synth
+    state = []
+    for i in range(num_synths):
+        synth_state = {
+            'amplitude_a': round(float(amplitude_a[i]), 2),
+            'amplitude_b': round(float(amplitude_b[i]), 2),
+            'frequency_a': round(float(frequency_a[i]), 2),
+            'frequency_b': round(float(frequency_b[i]), 2),
+            'phase_a': round(float(phase_a[i]), 2),
+            'phase_b': round(float(phase_b[i]), 2),
+            'harmonics_a': round(float(harmonics_a[i]), 2),
+            'harmonics_b': round(float(harmonics_b[i]), 2)
+        }
+        state.append(synth_state)
+    try:
+        with open(STATE_FILE, 'w') as f:
+            json.dump({'num_synths': num_synths, 'synths': state}, f, indent=2)
+    except Exception as e:
+        print(f"Warning: Could not save synth state: {e}")
+
+def load_synth_state():
+    """Load synth/channel values from JSON file, or return None if not found"""
+    if not os.path.exists(STATE_FILE):
+        return None
+    try:
+        with open(STATE_FILE, 'r') as f:
+            state = json.load(f)
+        # Return None if structure is not as expected
+        if 'num_synths' not in state or 'synths' not in state:
+            return None
+        return state
+    except Exception as e:
+        print(f"Warning: Could not load synth state: {e}")
+        return None
 
 # ANSI color codes for console output
 class Colors:
@@ -293,17 +365,36 @@ def initialize_system():
         step3_start_time = time.time()
         print(f"\n{Colors.BLUE}Step 3/3: Initializing control system...{Colors.END}")
                 
-        # Initialize control variables for all synths
+
+        # Try to load persistent state
         num_synths = len(synths)
-        amplitude_a = [50.0] * num_synths  # Start at 50% for each synth
-        amplitude_b = [50.0] * num_synths
-        frequency_a = [50.0] * num_synths  # Start at 50Hz for each synth
-        frequency_b = [50.0] * num_synths
-        phase_a = [0.0] * num_synths  # Start at 0 degrees for each synth
-        phase_b = [0.0] * num_synths
-        harmonics_a = [0.0] * num_synths  # Start at 0% harmonics
-        harmonics_b = [0.0] * num_synths
-        
+        state = load_synth_state()
+        if state and state.get('num_synths', num_synths) == num_synths and isinstance(state.get('synths'), list):
+            synth_states = state['synths']
+            amplitude_a = [s.get('amplitude_a', get_default_for_synth(i, 'amplitude_a')) for i, s in enumerate(synth_states)]
+            amplitude_b = [s.get('amplitude_b', get_default_for_synth(i, 'amplitude_b')) for i, s in enumerate(synth_states)]
+            frequency_a = [s.get('frequency_a', get_default_for_synth(i, 'frequency')) for i, s in enumerate(synth_states)]
+            frequency_b = [s.get('frequency_b', get_default_for_synth(i, 'frequency')) for i, s in enumerate(synth_states)]
+            phase_a = [s.get('phase_a', get_default_for_synth(i, 'phase')) for i, s in enumerate(synth_states)]
+            phase_b = [s.get('phase_b', get_default_for_synth(i, 'phase')) for i, s in enumerate(synth_states)]
+            harmonics_a = [s.get('harmonics_a', get_default_for_synth(i, 'harmonics')) for i, s in enumerate(synth_states)]
+            harmonics_b = [s.get('harmonics_b', get_default_for_synth(i, 'harmonics')) for i, s in enumerate(synth_states)]
+            print(f"{Colors.YELLOW}Loaded synth state from {STATE_FILE}{Colors.END}")
+        else:
+            amplitude_a = [get_default_for_synth(i, 'amplitude_a') for i in range(num_synths)]
+            amplitude_b = [get_default_for_synth(i, 'amplitude_b') for i in range(num_synths)]
+            frequency_a = [get_default_for_synth(i, 'frequency') for i in range(num_synths)]
+            frequency_b = [get_default_for_synth(i, 'frequency') for i in range(num_synths)]
+            harmonics_a = [get_default_for_synth(i, 'harmonics') for i in range(num_synths)]
+            harmonics_b = [get_default_for_synth(i, 'harmonics') for i in range(num_synths)]
+            # Set default phase offsets for 3-phase simulation
+            if num_synths == 3:
+                phase_a = [0, 120, -120]
+                phase_b = [0, 120, -120]
+            else:
+                phase_a = [get_default_for_synth(i, 'phase') for i in range(num_synths)]
+                phase_b = [get_default_for_synth(i, 'phase') for i in range(num_synths)]
+
         # Control state for each encoder - now includes selection mode and timing
         selection_timeout = 60.0  # 60 seconds timeout for individual selection
         
@@ -353,26 +444,23 @@ def initialize_system():
         # Prepare batch commands for each synth to reduce serial communication overhead
         for i, synth in enumerate(synths):
             try:
-                # Send all initial settings in one batch to reduce communication delays
-                synth.set_amplitude('a', amplitude_a[i])
-                synth.set_amplitude('b', amplitude_b[i])
-                synth.set_frequency('a', frequency_a[i])
-                synth.set_frequency('b', frequency_b[i])
-                synth.set_phase('a', phase_a[i])
-                synth.set_phase('b', phase_b[i])
+                # Truncate all values to 2 decimal places before sending
+                amp_a = round(float(amplitude_a[i]), 2)
+                amp_b = round(float(amplitude_b[i]), 2)
+                freq_a = round(float(frequency_a[i]), 2)
+                freq_b = round(float(frequency_b[i]), 2)
+                ph_a = round(float(phase_a[i]), 2)
+                ph_b = round(float(phase_b[i]), 2)
+                synth.set_amplitude('a', amp_a)
+                synth.set_amplitude('b', amp_b)
+                synth.set_frequency('a', freq_a)
+                synth.set_frequency('b', freq_b)
+                synth.set_phase('a', ph_a)
+                synth.set_phase('b', ph_b)
                 print(f"{Colors.GREEN}    ✓ Synth {i + 1} configured{Colors.END}")
             except Exception as e:
                 print(f"{Colors.YELLOW}    ✗ Synth {i + 1} warning: {e}{Colors.END}")
             # Note: harmonics will be implemented as frequency adjustment
-        
-        # Define default values for reset functionality
-        default_values = {
-            'amplitude_a': 50.0,    # 50% amplitude
-            'amplitude_b': 50.0,    # 50% amplitude
-            'frequency': 50.0,      # 50Hz frequency
-            'phase': 0.0,           # 0 degrees phase
-            'harmonics': 0.0        # 0% harmonics
-        }
         
         # Set initial LED colors (distinct colors for each function)
         led_colors = {
@@ -463,7 +551,6 @@ def initialize_system():
             'dummy_button': dummy_button,
             'dummy_pixel': dummy_pixel,
             'led_colors': led_colors,
-            'default_values': default_values,
             'amplitude_a': amplitude_a,
             'amplitude_b': amplitude_b,
             'frequency_a': frequency_a,
@@ -492,97 +579,110 @@ def initialize_system():
 
 
 def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, button_press_time, 
-                          hold_threshold, led_colors, default_values, amplitude_a, amplitude_b, 
+                          hold_threshold, led_colors, amplitude_a, amplitude_b, 
                           frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
                           active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout):
     """Handle button presses for all encoders with hold detection"""
+    # Track if button was held for each function
+    if not hasattr(handle_encoder_buttons, "was_held"):
+        handle_encoder_buttons.was_held = {func: False for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
+    was_held = handle_encoder_buttons.was_held
+    # Track if release should be blocked after reset
+    if not hasattr(handle_encoder_buttons, "block_release"):
+        handle_encoder_buttons.block_release = {func: False for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
+    block_release = handle_encoder_buttons.block_release
+
     for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
         if not encoders[func] or not buttons[func]:
             continue
-            
+
         button = buttons[func]
         pixel = pixels[func]
-        
+
         # Check for button press with hold detection
         if not button.value and not button_pressed[func]:
             # Button just pressed
             button_pressed[func] = True
             button_press_time[func] = time.time()
-            
+            was_held[func] = False
+
         elif not button.value and button_pressed[func]:
             # Button is being held down - check for hold duration
             hold_duration = time.time() - button_press_time[func]
             if hold_duration >= hold_threshold:
                 # Long hold detected - reset to defaults
                 button_pressed[func] = False  # Prevent multiple resets
-                
+                was_held[func] = True
+                block_release[func] = True
+
+
                 if func == 'amplitude_a':
                     # Reset amplitude A based on current selection mode
                     if selection_mode[func] == 'all':
                         # Reset all synths
                         for i in range(num_synths):
-                            amplitude_a[i] = default_values['amplitude_a']
-                            synths[i].set_amplitude('a', amplitude_a[i])
+                            amplitude_a[i] = get_default_for_synth(i, 'amplitude_a')
+                            synths[i].set_amplitude('a', round(float(amplitude_a[i]), 2))
                         print(f"\n{Colors.RED}Amplitude A Reset: All synths = {amplitude_a[0]:.0f}%{Colors.END}")
                     else:
                         # Reset only active synth
                         synth_idx = active_synth[func]
-                        amplitude_a[synth_idx] = default_values['amplitude_a']
+                        amplitude_a[synth_idx] = get_default_for_synth(synth_idx, 'amplitude_a')
                         synths[synth_idx].set_amplitude('a', amplitude_a[synth_idx])
                         print(f"\n{Colors.RED}Amplitude A Reset: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%{Colors.END}")
-                    
+
                 elif func == 'amplitude_b':
                     # Reset amplitude B based on current selection mode
                     if selection_mode[func] == 'all':
                         # Reset all synths
                         for i in range(num_synths):
-                            amplitude_b[i] = default_values['amplitude_b']
-                            synths[i].set_amplitude('b', amplitude_b[i])
+                            amplitude_b[i] = get_default_for_synth(i, 'amplitude_b')
+                            synths[i].set_amplitude('b', round(float(amplitude_b[i]), 2))
                         print(f"\n{Colors.ORANGE}Amplitude B Reset: All synths = {amplitude_b[0]:.0f}%{Colors.END}")
                     else:
                         # Reset only active synth
                         synth_idx = active_synth[func]
-                        amplitude_b[synth_idx] = default_values['amplitude_b']
+                        amplitude_b[synth_idx] = get_default_for_synth(synth_idx, 'amplitude_b')
                         synths[synth_idx].set_amplitude('b', amplitude_b[synth_idx])
                         print(f"\n{Colors.ORANGE}Amplitude B Reset: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%{Colors.END}")
-                    
+
                 elif func == 'frequency':
                     # Reset frequency for all synths (always affects all)
                     for i in range(num_synths):
-                        frequency_a[i] = default_values['frequency']
-                        frequency_b[i] = default_values['frequency']
-                        synths[i].set_frequency('a', frequency_a[i])
-                        synths[i].set_frequency('b', frequency_b[i])
+                        frequency_a[i] = get_default_for_synth(i, 'frequency')
+                        frequency_b[i] = get_default_for_synth(i, 'frequency')
+                        synths[i].set_frequency('a', round(float(frequency_a[i]), 2))
+                        synths[i].set_frequency('b', round(float(frequency_b[i]), 2))
                     print(f"\n{Colors.GREEN}Frequency Reset: All synths = {frequency_a[0]:.1f}Hz{Colors.END}")
-                    
+
                 elif func == 'phase':
                     # Reset phase based on current selection mode
                     if selection_mode[func] == 'all':
                         # Reset all synths channel B only
                         for i in range(num_synths):
-                            phase_b[i] = default_values['phase']
-                            synths[i].set_phase('b', phase_b[i])
+                            phase_b[i] = get_default_for_synth(i, 'phase')
+                            synths[i].set_phase('b', round(float(phase_b[i]), 2))
                         print(f"\n{Colors.BLUE}Phase Reset: All synths Ch B = {phase_b[0]:.0f}°{Colors.END}")
                     else:
                         # Reset active synth and channel
                         synth_idx = active_synth[func]
                         channel = active_channel[func]
                         if channel == 'a':
-                            phase_a[synth_idx] = default_values['phase']
-                            synths[synth_idx].set_phase('a', phase_a[synth_idx])
+                            phase_a[synth_idx] = get_default_for_synth(synth_idx, 'phase')
+                            synths[synth_idx].set_phase('a', round(float(phase_a[synth_idx]), 2))
                             print(f"\n{Colors.BLUE}Phase Reset: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°{Colors.END}")
                         else:
-                            phase_b[synth_idx] = default_values['phase']
-                            synths[synth_idx].set_phase('b', phase_b[synth_idx])
+                            phase_b[synth_idx] = get_default_for_synth(synth_idx, 'phase')
+                            synths[synth_idx].set_phase('b', round(float(phase_b[synth_idx]), 2))
                             print(f"\n{Colors.BLUE}Phase Reset: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°{Colors.END}")
-                        
+
                 elif func == 'harmonics':
                     # Reset harmonics based on current selection mode
                     if selection_mode[func] == 'all':
                         # Reset all synths and channels
                         for i in range(num_synths):
-                            harmonics_a[i] = default_values['harmonics']
-                            harmonics_b[i] = default_values['harmonics']
+                            harmonics_a[i] = get_default_for_synth(i, 'harmonics')
+                            harmonics_b[i] = get_default_for_synth(i, 'harmonics')
                             synths[i].clear_harmonics('a')
                             synths[i].clear_harmonics('b')
                         print(f"\n{Colors.HEADER}Harmonics Reset: All synths/channels = {harmonics_a[0]:.0f}%{Colors.END}")
@@ -591,25 +691,31 @@ def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, bu
                         synth_idx = active_synth[func]
                         channel = active_channel[func]
                         if channel == 'a':
-                            harmonics_a[synth_idx] = default_values['harmonics']
+                            harmonics_a[synth_idx] = get_default_for_synth(synth_idx, 'harmonics')
                             synths[synth_idx].clear_harmonics('a')
                             print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}%{Colors.END}")
                         else:
-                            harmonics_b[synth_idx] = default_values['harmonics']
+                            harmonics_b[synth_idx] = get_default_for_synth(synth_idx, 'harmonics')
                             synths[synth_idx].clear_harmonics('b')
                             print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}%{Colors.END}")
-                
+
                 # Flash LED white to indicate reset
                 if pixel:
                     pixel.fill((255, 255, 255))
                     time.sleep(0.2)
                     pixel.fill(led_colors[func])
-            
+
         elif button.value and button_pressed[func]:
             # Button released
             hold_duration = time.time() - button_press_time[func]
             button_pressed[func] = False
-            
+
+            # If release should be blocked after reset, skip selection mode change
+            if block_release[func]:
+                block_release[func] = False
+                was_held[func] = False
+                continue
+
             # Only process as short press if it was shorter than hold threshold
             if hold_duration < hold_threshold:
                 # Short press: switch to individual mode or cycle through targets
@@ -632,7 +738,7 @@ def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, bu
                             # After last synth, go back to all mode
                             selection_mode[func] = 'all'
                             print(f"\n{func.replace('_', ' ').title()}: Switched back to ALL synths mode")
-                        
+
                 elif func in ['phase', 'harmonics']:
                     if selection_mode[func] == 'all':
                         # Switch to individual mode
@@ -658,14 +764,14 @@ def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, bu
                                 # After last synth/channel, go back to all mode
                                 selection_mode[func] = 'all'
                                 print(f"\n{func.title()}: Switched back to ALL synths Ch B mode")
-                
+
                 # Show current status for button presses
                 if func != 'frequency':
                     print(f"Mode: {selection_mode[func].upper()}")
                     for i in range(num_synths):
                         print(f"Synth {i + 1} - Ch A: Amp={amplitude_a[i]:.0f}%, Freq={frequency_a[i]:.1f}Hz, Phase={phase_a[i]:.0f}°, Harm={harmonics_a[i]:.0f}%")
                         print(f"Synth {i + 1} - Ch B: Amp={amplitude_b[i]:.0f}%, Freq={frequency_b[i]:.1f}Hz, Phase={phase_b[i]:.0f}°, Harm={harmonics_b[i]:.0f}%")
-                
+
                 time.sleep(0.1)  # Debounce
 
 
@@ -692,85 +798,71 @@ def handle_encoder_rotation(encoders, synths, last_positions, amplitude_a, ampli
         encoder = encoders[func]
         if encoder is None:
             continue
-            
         position = encoder.position
         if position != last_positions[func]:
             # Calculate change
             delta = position - last_positions[func]
-            
+            changed = False
             if func == 'amplitude_a':
-                # Amplitude A: 1 step = 2% change
-                delta_val = delta * 2
+                delta_val = delta
                 if selection_mode[func] == 'all':
-                    # Affect all synths
                     for i in range(num_synths):
                         amplitude_a[i] = max(0, min(100, amplitude_a[i] + delta_val))
-                        synths[i].set_amplitude('a', amplitude_a[i])
+                        synths[i].set_amplitude('a', round(float(amplitude_a[i]), 2))
                     print(f"{Colors.RED}Amplitude A: All synths = {amplitude_a[0]:.0f}%{Colors.END}")
                 else:
-                    # Affect only active synth
                     synth_idx = active_synth[func]
                     amplitude_a[synth_idx] = max(0, min(100, amplitude_a[synth_idx] + delta_val))
-                    synths[synth_idx].set_amplitude('a', amplitude_a[synth_idx])
+                    synths[synth_idx].set_amplitude('a', round(float(amplitude_a[synth_idx]), 2))
                     print(f"{Colors.RED}Amplitude A: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%{Colors.END}")
-                
+                changed = True
             elif func == 'amplitude_b':
-                # Amplitude B: 1 step = 2% change
-                delta_val = delta * 2
+                delta_val = delta
                 if selection_mode[func] == 'all':
-                    # Affect all synths
                     for i in range(num_synths):
                         amplitude_b[i] = max(0, min(100, amplitude_b[i] + delta_val))
-                        synths[i].set_amplitude('b', amplitude_b[i])
+                        synths[i].set_amplitude('b', round(float(amplitude_b[i]), 2))
                     print(f"{Colors.ORANGE}Amplitude B: All synths = {amplitude_b[0]:.0f}%{Colors.END}")
                 else:
-                    # Affect only active synth
                     synth_idx = active_synth[func]
                     amplitude_b[synth_idx] = max(0, min(100, amplitude_b[synth_idx] + delta_val))
-                    synths[synth_idx].set_amplitude('b', amplitude_b[synth_idx])
+                    synths[synth_idx].set_amplitude('b', round(float(amplitude_b[synth_idx]), 2))
                     print(f"{Colors.ORANGE}Amplitude B: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%{Colors.END}")
-                
+                changed = True
             elif func == 'frequency':
-                # Frequency: 1 step = 0.1Hz change for ALL synths and channels (always)
                 delta_val = delta * 0.1
                 for i in range(num_synths):
                     frequency_a[i] = max(20, min(8000, frequency_a[i] + delta_val))
                     frequency_b[i] = max(20, min(8000, frequency_b[i] + delta_val))
-                    synths[i].set_frequency('a', frequency_a[i])
-                    synths[i].set_frequency('b', frequency_b[i])
+                    synths[i].set_frequency('a', round(float(frequency_a[i]), 2))
+                    synths[i].set_frequency('b', round(float(frequency_b[i]), 2))
                 print(f"{Colors.GREEN}Frequency: All synths = {frequency_a[0]:.1f}Hz{Colors.END}")
-                
+                changed = True
             elif func == 'phase':
-                # Phase: 1 step = 5 degree change
-                delta_val = delta * 5
+                delta_val = delta
                 if selection_mode[func] == 'all':
-                    # Affect all synths channel B only
                     for i in range(num_synths):
-                        phase_b[i] = max(-180, min(180, phase_b[i] + delta_val))
-                        synths[i].set_phase('b', phase_b[i])
+                        phase_b[i] = max(-360, min(360, phase_b[i] + delta_val))
+                        synths[i].set_phase('b', round(float(phase_b[i]), 2))
                     print(f"{Colors.BLUE}Phase: All synths Ch B = {phase_b[0]:.0f}°{Colors.END}")
                 else:
-                    # Affect only active synth and channel
                     synth_idx = active_synth[func]
                     channel = active_channel[func]
                     if channel == 'a':
-                        phase_a[synth_idx] = max(-180, min(180, phase_a[synth_idx] + delta_val))
-                        synths[synth_idx].set_phase('a', phase_a[synth_idx])
+                        phase_a[synth_idx] = max(-360, min(360, phase_a[synth_idx] + delta_val))
+                        synths[synth_idx].set_phase('a', round(float(phase_a[synth_idx]), 2))
                         print(f"{Colors.BLUE}Phase: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°{Colors.END}")
                     else:
-                        phase_b[synth_idx] = max(-180, min(180, phase_b[synth_idx] + delta_val))
-                        synths[synth_idx].set_phase('b', phase_b[synth_idx])
+                        phase_b[synth_idx] = max(-360, min(360, phase_b[synth_idx] + delta_val))
+                        synths[synth_idx].set_phase('b', round(float(phase_b[synth_idx]), 2))
                         print(f"{Colors.BLUE}Phase: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°{Colors.END}")
-                    
+                changed = True
             elif func == 'harmonics':
-                # Harmonics: 1 step = 5% change
-                delta_val = delta * 5
+                delta_val = delta
                 if selection_mode[func] == 'all':
-                    # Affect all synths and channels
                     for i in range(num_synths):
                         harmonics_a[i] = max(0, min(100, harmonics_a[i] + delta_val))
                         harmonics_b[i] = max(0, min(100, harmonics_b[i] + delta_val))
-                        # Use the add_harmonic method for 5th harmonic
                         if harmonics_a[i] > 0:
                             synths[i].add_harmonic('a', 5, harmonics_a[i])
                         else:
@@ -781,12 +873,10 @@ def handle_encoder_rotation(encoders, synths, last_positions, amplitude_a, ampli
                             synths[i].clear_harmonics('b')
                     print(f"{Colors.HEADER}Harmonics: All synths/channels = {harmonics_a[0]:.0f}% (5th harmonic){Colors.END}")
                 else:
-                    # Affect only active synth and channel
                     synth_idx = active_synth[func]
                     channel = active_channel[func]
                     if channel == 'a':
                         harmonics_a[synth_idx] = max(0, min(100, harmonics_a[synth_idx] + delta_val))
-                        # Use the add_harmonic method for 5th harmonic
                         if harmonics_a[synth_idx] > 0:
                             synths[synth_idx].add_harmonic('a', 5, harmonics_a[synth_idx])
                         else:
@@ -794,14 +884,15 @@ def handle_encoder_rotation(encoders, synths, last_positions, amplitude_a, ampli
                         print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}% (5th harmonic){Colors.END}")
                     else:
                         harmonics_b[synth_idx] = max(0, min(100, harmonics_b[synth_idx] + delta_val))
-                        # Use the add_harmonic method for 5th harmonic
                         if harmonics_b[synth_idx] > 0:
                             synths[synth_idx].add_harmonic('b', 5, harmonics_b[synth_idx])
                         else:
                             synths[synth_idx].clear_harmonics('b')
                         print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}% (5th harmonic){Colors.END}")
-            
+                changed = True
             last_positions[func] = position
+            if changed:
+                save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b)
 
 
 def main():
@@ -819,7 +910,6 @@ def main():
         dummy_button = system['dummy_button']
         dummy_pixel = system['dummy_pixel']
         led_colors = system['led_colors']
-        default_values = system['default_values']
         amplitude_a = system['amplitude_a']
         amplitude_b = system['amplitude_b']
         frequency_a = system['frequency_a']
@@ -850,7 +940,7 @@ def main():
                     # Handle button presses for all encoders
                     handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, 
                                          button_press_time, hold_threshold, led_colors, 
-                                         default_values, amplitude_a, amplitude_b, frequency_a, 
+                                         amplitude_a, amplitude_b, frequency_a, 
                                          frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
                                          active_synth, active_channel, num_synths, selection_mode, 
                                          selection_time, selection_timeout)

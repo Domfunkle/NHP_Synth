@@ -1,0 +1,25 @@
+{
+  "synths": [
+    {
+      "amplitude_a": 100.0,
+      "amplitude_b": 50.0,
+      "frequency": 50.0,
+      "phase": 0.0,
+      "harmonics": 0.0
+    },
+    {
+      "amplitude_a": 100.0,
+      "amplitude_b": 50.0,
+      "frequency": 50.0,
+      "phase": 120.0,
+      "harmonics": 0.0
+    },
+    {
+      "amplitude_a": 100.0,
+      "amplitude_b": 50.0,
+      "frequency": 50.0,
+      "phase": -120.0,
+      "harmonics": 0.0
+    }
+  ]
+}
