@@ -66,8 +66,8 @@ def save_synth_state(num_synths, amplitude_a, amplitude_b, frequency_a, frequenc
             'frequency_b': round(float(frequency_b[i]), 2),
             'phase_a': round(float(phase_a[i]), 2),
             'phase_b': round(float(phase_b[i]), 2),
-            'harmonics_a': round(float(harmonics_a[i]), 2),
-            'harmonics_b': round(float(harmonics_b[i]), 2)
+            'harmonics_a': harmonics_a[i],  # list of dicts
+            'harmonics_b': harmonics_b[i]   # list of dicts
         }
         state.append(synth_state)
     try:
@@ -86,6 +86,11 @@ def load_synth_state():
         # Return None if structure is not as expected
         if 'num_synths' not in state or 'synths' not in state:
             return None
+        # Ensure harmonics_a/b are lists of dicts
+        for synth in state['synths']:
+            for key in ['harmonics_a', 'harmonics_b']:
+                if key not in synth or not isinstance(synth[key], list):
+                    synth[key] = []
         return state
     except Exception as e:
         print(f"Warning: Could not load synth state: {e}")
@@ -380,16 +385,17 @@ def initialize_system():
             frequency_b = [s.get('frequency_b', get_default_for_synth(i, 'frequency_b')) for i, s in enumerate(synth_states)]
             phase_a = [s.get('phase_a', get_default_for_synth(i, 'phase_a')) for i, s in enumerate(synth_states)]
             phase_b = [s.get('phase_b', get_default_for_synth(i, 'phase_b')) for i, s in enumerate(synth_states)]
-            harmonics_a = [s.get('harmonics_a', get_default_for_synth(i, 'harmonics_a')) for i, s in enumerate(synth_states)]
-            harmonics_b = [s.get('harmonics_b', get_default_for_synth(i, 'harmonics_b')) for i, s in enumerate(synth_states)]
+            harmonics_a = [s.get('harmonics_a', []) for s in synth_states]
+            harmonics_b = [s.get('harmonics_b', []) for s in synth_states]
             print(f"{Colors.YELLOW}Loaded synth state from {STATE_FILE}{Colors.END}")
         else:
             amplitude_a = [get_default_for_synth(i, 'amplitude_a') for i in range(num_synths)]
             amplitude_b = [get_default_for_synth(i, 'amplitude_b') for i in range(num_synths)]
             frequency_a = [get_default_for_synth(i, 'frequency_a') for i in range(num_synths)]
             frequency_b = [get_default_for_synth(i, 'frequency_b') for i in range(num_synths)]
-            harmonics_a = [get_default_for_synth(i, 'harmonics_a') for i in range(num_synths)]
-            harmonics_b = [get_default_for_synth(i, 'harmonics_b') for i in range(num_synths)]
+            # harmonics_a/b: initialize as empty lists (no harmonics by default)
+            harmonics_a = [[] for _ in range(num_synths)]
+            harmonics_b = [[] for _ in range(num_synths)]
             # Set default phase offsets for 3-phase simulation
             if num_synths == 3:
                 phase_a = [0, 120, -120]
@@ -530,9 +536,13 @@ def initialize_system():
         print(f"   {Colors.HEADER}0x3a - Harmonics (all synths by default, button for individual){Colors.END}")
 
         print(f"\n{Colors.BOLD}{Colors.YELLOW}Current Settings:{Colors.END}")
+        def harmonics_summary(hlist):
+            if not hlist:
+                return "0%"
+            return ", ".join(f"{h['order']}:{h['amplitude']}%/{h['phase']}°" for h in hlist)
         for i in range(num_synths):
-            print(f"   {Colors.CYAN}Synth {i + 1} - Ch A: {Colors.RED}Amp={amplitude_a[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_a[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_a[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm={harmonics_a[i]:.0f}%{Colors.END}")
-            print(f"   {Colors.CYAN}Synth {i + 1} - Ch B: {Colors.ORANGE}Amp={amplitude_b[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_b[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_b[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm={harmonics_b[i]:.0f}%{Colors.END}")
+            print(f"   {Colors.CYAN}Synth {i + 1} - Ch A: {Colors.RED}Amp={amplitude_a[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_a[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_a[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm=[{harmonics_summary(harmonics_a[i])}]{Colors.END}")
+            print(f"   {Colors.CYAN}Synth {i + 1} - Ch B: {Colors.ORANGE}Amp={amplitude_b[i]:.0f}%{Colors.END}, {Colors.GREEN}Freq={frequency_b[i]:.1f}Hz{Colors.END}, {Colors.BLUE}Phase={phase_b[i]:.0f}°{Colors.END}, {Colors.HEADER}Harm=[{harmonics_summary(harmonics_b[i])}]{Colors.END}")
         
         print(f"\n{Colors.BOLD}{Colors.YELLOW}Usage Instructions:{Colors.END}")
         print(f"   • {Colors.CYAN}Default Mode{Colors.END}: All encoders affect all synths simultaneously")
@@ -686,23 +696,23 @@ def handle_encoder_buttons(encoders, buttons, pixels, synths, button_pressed, bu
                     if selection_mode[func] == 'all':
                         # Reset all synths and channels
                         for i in range(num_synths):
-                            harmonics_a[i] = get_default_for_synth(i, 'harmonics')
-                            harmonics_b[i] = get_default_for_synth(i, 'harmonics')
+                            harmonics_a[i] = []
+                            harmonics_b[i] = []
                             synths[i].clear_harmonics('a')
                             synths[i].clear_harmonics('b')
-                        print(f"\n{Colors.HEADER}Harmonics Reset: All synths/channels = {harmonics_a[0]:.0f}%{Colors.END}")
+                        print(f"\n{Colors.HEADER}Harmonics Reset: All synths/channels = 0%{Colors.END}")
                     else:
                         # Reset active synth and channel
                         synth_idx = active_synth[func]
                         channel = active_channel[func]
                         if channel == 'a':
-                            harmonics_a[synth_idx] = get_default_for_synth(synth_idx, 'harmonics')
+                            harmonics_a[synth_idx] = []
                             synths[synth_idx].clear_harmonics('a')
-                            print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}%{Colors.END}")
+                            print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch A = 0%{Colors.END}")
                         else:
-                            harmonics_b[synth_idx] = get_default_for_synth(synth_idx, 'harmonics')
+                            harmonics_b[synth_idx] = []
                             synths[synth_idx].clear_harmonics('b')
-                            print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}%{Colors.END}")
+                            print(f"\n{Colors.HEADER}Harmonics Reset: Synth {synth_idx + 1} Ch B = 0%{Colors.END}")
 
                 # Flash LED white to indicate reset
                 if pixel:
@@ -864,38 +874,68 @@ def handle_encoder_rotation(encoders, synths, last_positions, amplitude_a, ampli
                 changed = True
             elif func == 'harmonics':
                 delta_val = delta
+                # For this example, we will only adjust the amplitude of the first harmonic in the list (if present), or add a default if empty
+                def update_harmonics_list(hlist, order, phase, delta_val):
+                    # Find harmonic with given order/phase, else add new
+                    for h in hlist:
+                        if h['order'] == order and h['phase'] == phase:
+                            h['amplitude'] = max(0, min(100, h['amplitude'] + delta_val))
+                            return
+                    # If not found, add new
+                    hlist.append({'order': order, 'amplitude': max(0, min(100, delta_val)), 'phase': phase})
+
                 if selection_mode[func] == 'all':
                     for i in range(num_synths):
-                        harmonics_a[i] = max(0, min(100, harmonics_a[i] + delta_val))
-                        harmonics_b[i] = max(0, min(100, harmonics_b[i] + delta_val))
-                        # Channel A: add 3rd and 5th harmonic, 0 phase
+                        # Channel A: 3rd and 5th, phase 0
+                        harmonics_a[i] = [
+                            {'order': 3, 'amplitude': 0, 'phase': 0},
+                            {'order': 5, 'amplitude': 0, 'phase': 0}
+                        ] if not harmonics_a[i] else harmonics_a[i]
+                        for h in harmonics_a[i]:
+                            update_harmonics_list(harmonics_a[i], h['order'], h['phase'], delta_val)
                         synths[i].clear_harmonics('a')
-                        if harmonics_a[i] > 0:
-                            synths[i].add_harmonic('a', 3, harmonics_a[i])
-                            synths[i].add_harmonic('a', 5, harmonics_a[i])
-                        # Channel B: add 3rd and 5th harmonic, 180 phase
+                        for h in harmonics_a[i]:
+                            if h['amplitude'] > 0:
+                                synths[i].add_harmonic('a', h['order'], h['amplitude'], phase=h['phase'])
+                        # Channel B: 3rd and 5th, phase 180
+                        harmonics_b[i] = [
+                            {'order': 3, 'amplitude': 0, 'phase': 180},
+                            {'order': 5, 'amplitude': 0, 'phase': 180}
+                        ] if not harmonics_b[i] else harmonics_b[i]
+                        for h in harmonics_b[i]:
+                            update_harmonics_list(harmonics_b[i], h['order'], h['phase'], delta_val)
                         synths[i].clear_harmonics('b')
-                        if harmonics_b[i] > 0:
-                            synths[i].add_harmonic('b', 3, harmonics_b[i], phase=180)
-                            synths[i].add_harmonic('b', 5, harmonics_b[i], phase=180)
-                    print(f"{Colors.HEADER}Harmonics: All synths/channels = {harmonics_a[0]:.0f}% (3rd & 5th){Colors.END}")
+                        for h in harmonics_b[i]:
+                            if h['amplitude'] > 0:
+                                synths[i].add_harmonic('b', h['order'], h['amplitude'], phase=h['phase'])
+                    print(f"{Colors.HEADER}Harmonics: All synths/channels updated (orders 3 & 5){Colors.END}")
                 else:
                     synth_idx = active_synth[func]
                     channel = active_channel[func]
                     if channel == 'a':
-                        harmonics_a[synth_idx] = max(0, min(100, harmonics_a[synth_idx] + delta_val))
+                        harmonics_a[synth_idx] = [
+                            {'order': 3, 'amplitude': 0, 'phase': 0},
+                            {'order': 5, 'amplitude': 0, 'phase': 0}
+                        ] if not harmonics_a[synth_idx] else harmonics_a[synth_idx]
+                        for h in harmonics_a[synth_idx]:
+                            update_harmonics_list(harmonics_a[synth_idx], h['order'], h['phase'], delta_val)
                         synths[synth_idx].clear_harmonics('a')
-                        if harmonics_a[synth_idx] > 0:
-                            synths[synth_idx].add_harmonic('a', 3, harmonics_a[synth_idx])
-                            synths[synth_idx].add_harmonic('a', 5, harmonics_a[synth_idx])
-                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch A = {harmonics_a[synth_idx]:.0f}% (3rd & 5th){Colors.END}")
+                        for h in harmonics_a[synth_idx]:
+                            if h['amplitude'] > 0:
+                                synths[synth_idx].add_harmonic('a', h['order'], h['amplitude'], phase=h['phase'])
+                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch A updated (orders 3 & 5){Colors.END}")
                     else:
-                        harmonics_b[synth_idx] = max(0, min(100, harmonics_b[synth_idx] + delta_val))
+                        harmonics_b[synth_idx] = [
+                            {'order': 3, 'amplitude': 0, 'phase': 180},
+                            {'order': 5, 'amplitude': 0, 'phase': 180}
+                        ] if not harmonics_b[synth_idx] else harmonics_b[synth_idx]
+                        for h in harmonics_b[synth_idx]:
+                            update_harmonics_list(harmonics_b[synth_idx], h['order'], h['phase'], delta_val)
                         synths[synth_idx].clear_harmonics('b')
-                        if harmonics_b[synth_idx] > 0:
-                            synths[synth_idx].add_harmonic('b', 3, harmonics_b[synth_idx], phase=180)
-                            synths[synth_idx].add_harmonic('b', 5, harmonics_b[synth_idx], phase=180)
-                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch B = {harmonics_b[synth_idx]:.0f}% (3rd & 5th, 180° phase){Colors.END}")
+                        for h in harmonics_b[synth_idx]:
+                            if h['amplitude'] > 0:
+                                synths[synth_idx].add_harmonic('b', h['order'], h['amplitude'], phase=h['phase'])
+                        print(f"{Colors.HEADER}Harmonics: Synth {synth_idx + 1} Ch B updated (orders 3 & 5, 180° phase){Colors.END}")
                 changed = True
             last_positions[func] = position
             if changed:
