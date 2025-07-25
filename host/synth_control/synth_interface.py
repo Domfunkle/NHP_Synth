@@ -107,16 +107,14 @@ class SynthInterface:
         
         Args:
             channel: 'a' or 'b'
-            phase: Phase in degrees (-180 to +180)
-            
+            phase: Phase in degrees (-360 to +360)
         Returns:
             True if command sent successfully
         """
         if channel.lower() not in ['a', 'b']:
             raise ValueError("Channel must be 'a' or 'b'")
-        if not (-180 <= phase <= 180):
-            raise ValueError("Phase must be between -180 and +180 degrees")
-            
+        if not (-360 <= phase <= 360):
+            raise ValueError("Phase must be between -360 and +360 degrees")
         return self.send_command(f"wp{channel.lower()}{phase}")
         
     def add_harmonic(self, channel: str, order: int, percent: float, phase: float = 0) -> bool:
@@ -127,8 +125,7 @@ class SynthInterface:
             channel: 'a' or 'b'
             order: Harmonic order (odd numbers >= 3)
             percent: Harmonic amplitude 0-100%
-            phase: Harmonic phase in degrees (default: 0)
-            
+            phase: Harmonic phase in degrees (default: 0, allowed: -360 to +360)
         Returns:
             True if command sent successfully
         """
@@ -138,9 +135,8 @@ class SynthInterface:
             raise ValueError("Harmonic order must be odd and >= 3")
         if not (0 <= percent <= 100):
             raise ValueError("Harmonic percent must be between 0 and 100")
-        if not (-180 <= phase <= 180):
-            raise ValueError("Harmonic phase must be between -180 and +180 degrees")
-            
+        if not (-360 <= phase <= 360):
+            raise ValueError("Harmonic phase must be between -360 and +360 degrees")
         if phase != 0:
             return self.send_command(f"wh{channel.lower()}{order},{percent},{phase}")
         else:
