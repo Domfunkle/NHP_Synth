@@ -173,7 +173,7 @@ class SystemInitializer:
             synths = []
             for i, device_path in enumerate(device_paths):
                 try:
-                    synth = SynthInterface(device_path)
+                    synth = SynthInterface(port = device_path, id = i)
                     synth.__enter__()
                     synths.append(synth)
                     device_name = device_path.split('/')[-1]

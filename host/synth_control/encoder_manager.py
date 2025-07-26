@@ -49,30 +49,30 @@ class EncoderManager:
                             for i in range(num_synths):
                                 amplitude_a[i] = get_default_for_synth(i, 'amplitude_a')
                                 synths[i].set_amplitude('a', round(float(amplitude_a[i]), 2))
-                            logger.info(f"Amplitude A Reset: All synths = {amplitude_a[0]:.0f}%")
+                            logger.info(f"Cmd: Amplitude A Reset: All synths = {amplitude_a[0]:.0f}%")
                         else:
                             synth_idx = active_synth[func]
                             amplitude_a[synth_idx] = get_default_for_synth(synth_idx, 'amplitude_a')
                             synths[synth_idx].set_amplitude('a', amplitude_a[synth_idx])
-                            logger.info(f"Amplitude A Reset: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%")
+                            logger.info(f"Cmd: Amplitude A Reset: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%")
                     elif func == 'amplitude_b':
                         if selection_mode[func] == 'all':
                             for i in range(num_synths):
                                 amplitude_b[i] = get_default_for_synth(i, 'amplitude_b')
                                 synths[i].set_amplitude('b', round(float(amplitude_b[i]), 2))
-                            logger.info(f"Amplitude B Reset: All synths = {amplitude_b[0]:.0f}%")
+                            logger.info(f"Cmd: Amplitude B Reset: All synths = {amplitude_b[0]:.0f}%")
                         else:
                             synth_idx = active_synth[func]
                             amplitude_b[synth_idx] = get_default_for_synth(synth_idx, 'amplitude_b')
                             synths[synth_idx].set_amplitude('b', amplitude_b[synth_idx])
-                            logger.info(f"Amplitude B Reset: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%")
+                            logger.info(f"Cmd: Amplitude B Reset: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%")
                     elif func == 'frequency':
                         for i in range(num_synths):
                             frequency_a[i] = get_default_for_synth(i, 'frequency_a')
                             frequency_b[i] = get_default_for_synth(i, 'frequency_b')
                             synths[i].set_frequency('a', round(float(frequency_a[i]), 2))
                             synths[i].set_frequency('b', round(float(frequency_b[i]), 2))
-                        logger.info(f"Frequency Reset: All synths = {frequency_a[0]:.1f}Hz")
+                        logger.info(f"Cmd: Frequency Reset: All synths = {frequency_a[0]:.1f}Hz")
                     elif func == 'phase':
                         if selection_mode[func] == 'all':
                             for i in range(num_synths):
@@ -80,18 +80,18 @@ class EncoderManager:
                                 phase_b[i] = get_default_for_synth(i, 'phase_b')
                                 synths[i].set_phase('a', round(float(phase_a[i]), 2))
                                 synths[i].set_phase('b', round(float(phase_b[i]), 2))
-                            logger.info(f"Phase Reset: All synths Ch A = {phase_a[0]:.0f}°, Ch B = {phase_b[0]:.0f}°")
+                            logger.info(f"Cmd: Phase Reset: All synths Ch A = {phase_a[0]:.0f}°, Ch B = {phase_b[0]:.0f}°")
                         else:
                             synth_idx = active_synth[func]
                             channel = active_channel[func]
                             if channel == 'a':
                                 phase_a[synth_idx] = get_default_for_synth(synth_idx, 'phase_a')
                                 synths[synth_idx].set_phase('a', round(float(phase_a[synth_idx]), 2))
-                                logger.info(f"Phase Reset: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°")
+                                logger.info(f"Cmd: Phase Reset: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°")
                             else:
                                 phase_b[synth_idx] = get_default_for_synth(synth_idx, 'phase_b')
                                 synths[synth_idx].set_phase('b', round(float(phase_b[synth_idx]), 2))
-                                logger.info(f"Phase Reset: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°")
+                                logger.info(f"Cmd: Phase Reset: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°")
                     elif func == 'harmonics':
                         if selection_mode[func] == 'all':
                             for i in range(num_synths):
@@ -99,18 +99,18 @@ class EncoderManager:
                                 harmonics_b[i] = []
                                 synths[i].clear_harmonics('a')
                                 synths[i].clear_harmonics('b')
-                            logger.info(f"Harmonics Reset: All synths/channels = 0%")
+                            logger.info(f"Cmd: Harmonics Reset: All synths/channels = 0%")
                         else:
                             synth_idx = active_synth[func]
                             channel = active_channel[func]
                             if channel == 'a':
                                 harmonics_a[synth_idx] = []
                                 synths[synth_idx].clear_harmonics('a')
-                                logger.info(f"Harmonics Reset: Synth {synth_idx + 1} Ch A = 0%")
+                                logger.info(f"Cmd: Harmonics Reset: Synth {synth_idx + 1} Ch A = 0%")
                             else:
                                 harmonics_b[synth_idx] = []
                                 synths[synth_idx].clear_harmonics('b')
-                                logger.info(f"Harmonics Reset: Synth {synth_idx + 1} Ch B = 0%")
+                                logger.info(f"Cmd: Harmonics Reset: Synth {synth_idx + 1} Ch B = 0%")
                     if pixel:
                         pixel.fill((255, 255, 255))
                         time.sleep(0.2)
@@ -127,44 +127,44 @@ class EncoderManager:
                     continue
                 if hold_duration < hold_threshold:
                     if func == 'frequency':
-                        logger.info(f"Frequency encoder always controls all synths simultaneously")
+                        pass
                     elif func in ['amplitude_a', 'amplitude_b']:
                         if selection_mode[func] == 'all':
                             selection_mode[func] = 'individual'
                             selection_time[func] = time.time()
                             active_synth[func] = 0
-                            logger.info(f"{func.replace('_', ' ').title()}: Switched to individual mode - Synth {active_synth[func] + 1}")
+                            logger.info(f"Cmd: {func.replace('_', ' ').title()}: Switched to individual mode - Synth {active_synth[func] + 1}")
                         else:
                             if active_synth[func] < num_synths - 1:
                                 active_synth[func] += 1
                                 selection_time[func] = time.time()
-                                logger.info(f"{func.replace('_', ' ').title()}: Switched to Synth {active_synth[func] + 1}")
+                                logger.info(f"Cmd: {func.replace('_', ' ').title()}: Switched to Synth {active_synth[func] + 1}")
                             else:
                                 selection_mode[func] = 'all'
-                                logger.info(f"{func.replace('_', ' ').title()}: Switched back to ALL synths mode")
+                                logger.info(f"Cmd: {func.replace('_', ' ').title()}: Switched back to ALL synths mode")
                     elif func in ['phase', 'harmonics']:
                         if selection_mode[func] == 'all':
                             selection_mode[func] = 'individual'
                             selection_time[func] = time.time()
                             active_synth[func] = 0
                             active_channel[func] = 'a'
-                            logger.info(f"{func.title()}: Switched to individual mode - Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
+                            logger.info(f"Cmd: {func.title()}: Switched to individual mode - Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
                         else:
                             if active_channel[func] == 'a':
                                 active_channel[func] = 'b'
                                 selection_time[func] = time.time()
-                                logger.info(f"{func.title()}: Switched to Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
+                                logger.info(f"Cmd: {func.title()}: Switched to Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
                             else:
                                 if active_synth[func] < num_synths - 1:
                                     active_channel[func] = 'a'
                                     active_synth[func] += 1
                                     selection_time[func] = time.time()
-                                    logger.info(f"{func.title()}: Switched to Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
+                                    logger.info(f"Cmd: {func.title()}: Switched to Synth {active_synth[func] + 1} Channel {active_channel[func].upper()}")
                                 else:
                                     selection_mode[func] = 'all'
-                                    logger.info(f"{func.title()}: Switched back to ALL synths Ch B mode")
+                                    logger.info(f"Cmd: {func.title()}: Switched back to ALL synths Ch B mode")
                     if func != 'frequency':
-                        logger.info(f"Mode: {selection_mode[func].upper()}")
+                        logger.info(f"Cmd: Mode: {selection_mode[func].upper()}")
                         def harmonics_summary(hlist):
                             if not hlist:
                                 return "None"
@@ -206,7 +206,7 @@ class EncoderManager:
                                     synths[i].set_amplitude('a', round(float(new_vals[i]), 2))
                                 for i in range(num_synths):
                                     amplitude_a[i] = new_vals[i]
-                                logger.info(f"Amplitude A: All synths = {amplitude_a[0]:.0f}%")
+                                    logger.info(f"Cmd: Amplitude A: All synths = {amplitude_a[0]:.0f}%")
                                 changed = True
                             except ValueError as e:
                                 logger.warning(f"Amplitude A update aborted: {e}")
@@ -218,7 +218,7 @@ class EncoderManager:
                         try:
                             synths[synth_idx].set_amplitude('a', round(float(new_val), 2))
                             amplitude_a[synth_idx] = new_val
-                            logger.info(f"Amplitude A: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%")
+                            logger.info(f"Cmd: Amplitude A: Synth {synth_idx + 1} = {amplitude_a[synth_idx]:.0f}%")
                             changed = True
                         except ValueError as e:
                             logger.warning(f"Amplitude A update aborted: {e}")
@@ -232,7 +232,7 @@ class EncoderManager:
                                     synths[i].set_amplitude('b', round(float(new_vals[i]), 2))
                                 for i in range(num_synths):
                                     amplitude_b[i] = new_vals[i]
-                                logger.info(f"Amplitude B: All synths = {amplitude_b[0]:.0f}%")
+                                logger.info(f"Cmd: Amplitude B: All synths = {amplitude_b[0]:.0f}%")
                                 changed = True
                             except ValueError as e:
                                 logger.warning(f"Amplitude B update aborted: {e}")
@@ -244,7 +244,7 @@ class EncoderManager:
                         try:
                             synths[synth_idx].set_amplitude('b', round(float(new_val), 2))
                             amplitude_b[synth_idx] = new_val
-                            logger.info(f"Amplitude B: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%")
+                            logger.info(f"Cmd: Amplitude B: Synth {synth_idx + 1} = {amplitude_b[synth_idx]:.0f}%")
                             changed = True
                         except ValueError as e:
                             logger.warning(f"Amplitude B update aborted: {e}")
@@ -259,7 +259,7 @@ class EncoderManager:
                         for i in range(num_synths):
                             frequency_a[i] = new_freq_a[i]
                             frequency_b[i] = new_freq_b[i]
-                        logger.info(f"Frequency: All synths = {frequency_a[0]:.1f}Hz")
+                        logger.info(f"Cmd: Frequency: All synths = {frequency_a[0]:.1f}Hz")
                         changed = True
                     except ValueError as e:
                         logger.warning(f"Frequency update aborted: {e}")
@@ -273,7 +273,7 @@ class EncoderManager:
                                     synths[i].set_phase('b', round(float(new_vals[i]), 2))
                                 for i in range(num_synths):
                                     phase_b[i] = new_vals[i]
-                                logger.info(f"Phase: All synths Ch B = {phase_b[0]:.0f}°")
+                                logger.info(f"Cmd: Phase: All synths Ch B = {phase_b[0]:.0f}°")
                                 changed = True
                             except ValueError as e:
                                 logger.warning(f"Phase update aborted: {e}")
@@ -287,7 +287,7 @@ class EncoderManager:
                             try:
                                 synths[synth_idx].set_phase('a', round(float(new_val), 2))
                                 phase_a[synth_idx] = new_val
-                                logger.info(f"Phase: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°")
+                                logger.info(f"Cmd: Phase: Synth {synth_idx + 1} Ch A = {phase_a[synth_idx]:.0f}°")
                                 changed = True
                             except ValueError as e:
                                 logger.warning(f"Phase update aborted: {e}")
@@ -296,7 +296,7 @@ class EncoderManager:
                             try:
                                 synths[synth_idx].set_phase('b', round(float(new_val), 2))
                                 phase_b[synth_idx] = new_val
-                                logger.info(f"Phase: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°")
+                                logger.info(f"Cmd: Phase: Synth {synth_idx + 1} Ch B = {phase_b[synth_idx]:.0f}°")
                                 changed = True
                             except ValueError as e:
                                 logger.warning(f"Phase update aborted: {e}")
@@ -330,7 +330,7 @@ class EncoderManager:
                             for h in harmonics_b[i]:
                                 if h['amplitude'] > 0:
                                     synths[i].add_harmonic('b', h['order'], h['amplitude'], phase=h['phase'])
-                        logger.info(f"Harmonics: All synths/channels updated (orders 3 & 5)")
+                        logger.info(f"Cmd: Harmonics: All synths/channels updated (orders 3 & 5)")
                     else:
                         synth_idx = active_synth[func]
                         channel = active_channel[func]
@@ -345,7 +345,7 @@ class EncoderManager:
                             for h in harmonics_a[synth_idx]:
                                 if h['amplitude'] > 0:
                                     synths[synth_idx].add_harmonic('a', h['order'], h['amplitude'], phase=h['phase'])
-                            logger.info(f"Harmonics: Synth {synth_idx + 1} Ch A updated (orders 3 & 5)")
+                            logger.info(f"Cmd: Harmonics: Synth {synth_idx + 1} Ch A updated (orders 3 & 5)")
                         else:
                             harmonics_b[synth_idx] = [
                                 {'order': 3, 'amplitude': 0, 'phase': 180},
@@ -357,7 +357,7 @@ class EncoderManager:
                             for h in harmonics_b[synth_idx]:
                                 if h['amplitude'] > 0:
                                     synths[synth_idx].add_harmonic('b', h['order'], h['amplitude'], phase=h['phase'])
-                            logger.info(f"Harmonics: Synth {synth_idx + 1} Ch B updated (orders 3 & 5, 180° phase)")
+                            logger.info(f"Cmd: Harmonics: Synth {synth_idx + 1} Ch B updated (orders 3 & 5, 180° phase)")
                 changed = True
                 last_positions[func] = position
                 if changed:

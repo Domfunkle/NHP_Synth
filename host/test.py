@@ -101,34 +101,56 @@ def test_encoder_emulation():
     button_press_time = {func: 0 for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
     hold_threshold = 1.0  # Hold for 1 second to trigger reset
 
-    # Simulate encoder rotations multiple times
-    for _ in range(2):  # Repeat the rotation simulation 2 times
-        for i in range(10):
-            # Randomly pick a key from last_positions and simulate a rotation
-            key = random.choice(list(last_positions.keys()))
-            last_positions[key] += random.choice([-5, 5])  # Randomly increase or decrease position
-            encoder_manager.handle_encoder_rotation(
-                encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
-                harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
-            )
+    def read_synth_state(synth, key):
+        try:
+            if key == 'amplitude_a':
+                synth.get_amplitude('a')
+            elif key == 'amplitude_b':
+                synth.get_amplitude('b')
+            elif key == 'frequency':
+                synth.get_frequency('a')
+                synth.get_frequency('b')
+            elif key == 'phase':
+                synth.get_phase('a')
+                synth.get_phase('b')
+            elif key == 'harmonics':
+                synth.get_harmonics('a')
+                synth.get_harmonics('b')
+        except Exception as e:
+            logger.error(f"Error getting state for synth {synth.id} key {key}: {e}")
 
-        # Simulate button presses and then rotations
-        for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
-            # Simulate button press
-            button_pressed[func] = True
-            button_press_time[func] = time.time()
-            encoder_manager.handle_encoder_buttons(
-                encoders, buttons, pixels, synths, button_pressed, button_press_time, hold_threshold, led_colors,
-                amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
-                active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout
-            )
-            button_pressed[func] = False
-            # rotate the encoder after button press
-            last_positions[func] += random.choice([-5, 5])
-            encoder_manager.handle_encoder_rotation(
-                encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
-                harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
-            )
+    # Simulate encoder rotations multiple times
+    for key in last_positions:
+        # Randomly pick a key from last_positions and simulate a rotation
+        last_positions[key] += random.choice([-5, 5])  # Randomly increase or decrease position
+        encoder_manager.handle_encoder_rotation(
+            encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
+            harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
+        )
+
+        for synth in synths:
+            read_synth_state(synth, key)
+        
+    # Simulate button presses and then rotations
+    for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
+        # Simulate button press
+        button_pressed[func] = True
+        button_press_time[func] = time.time()
+        encoder_manager.handle_encoder_buttons(
+            encoders, buttons, pixels, synths, button_pressed, button_press_time, hold_threshold, led_colors,
+            amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
+            active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout
+        )
+        button_pressed[func] = False
+        # rotate the encoder after button press
+        last_positions[func] += random.choice([-5, 5])
+        encoder_manager.handle_encoder_rotation(
+            encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
+            harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
+        )
+        
+        for synth in synths:
+            read_synth_state(synth, func)
 
     # Go through each button, set the selection_mode to 'all' and simulate a button hold beyond the threshold
     for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
@@ -142,6 +164,9 @@ def test_encoder_emulation():
             amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
             active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout
         )
+
+        for synth in synths:
+            read_synth_state(synth, func)
 
 if __name__ == '__main__':
     test_encoder_emulation()
