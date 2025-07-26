@@ -165,8 +165,16 @@ static void uart_cmd_task(void *arg) {
         if (len > 0) {
             if (ch == '\r' || ch == '\n') {
                 cmd_buf[cmd_pos] = '\0';
-                // Unified frequency command: wfa / wfb
-                if (strncmp(cmd_buf, "wf", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                // Unified frequency read command: rfa / rfb
+                if (strncmp(cmd_buf, "rf", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
+                    char response[32];
+                    snprintf(response, sizeof(response), "rf%c%.1f\r\n", 
+                             ch_idx == 0 ? 'a' : 'b', current_freq[ch_idx]);
+                    uart_write_bytes(UART_NUM, response, strlen(response));
+                
+                // Unified frequency write command: wfa / wfb
+                } else if (strncmp(cmd_buf, "wf", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float freq = strtof(cmd_buf + 3, NULL);
                     if (freq >= MIN_FREQ && freq <= MAX_FREQ) {
@@ -176,7 +184,16 @@ static void uart_cmd_task(void *arg) {
                     } else {
                         ESP_LOGW(TAG, "UART: Invalid channel %c frequency: %.1f (Allowed: %d-%d)", ch_idx == 0 ? 'A' : 'B', freq, MIN_FREQ, MAX_FREQ);
                     }
-                // Unified phase command: wpa / wpb
+
+                // Unified phase read command: rpa / rpb
+                } else if (strncmp(cmd_buf, "rp", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
+                    char response[32];
+                    snprintf(response, sizeof(response), "rp%c%.1f\r\n", 
+                             ch_idx == 0 ? 'a' : 'b', current_phase[ch_idx] * 180.0f / M_PI);
+                    uart_write_bytes(UART_NUM, response, strlen(response));
+
+                // Unified phase write command: wpa / wpb
                 } else if (strncmp(cmd_buf, "wp", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float phase = strtof(cmd_buf + 3, NULL);
@@ -187,7 +204,16 @@ static void uart_cmd_task(void *arg) {
                     if (phase > 360.0f) phase = 360.0f;
                     current_phase[ch_idx] = phase * M_PI_180;
                     // ESP_LOGI(TAG, "UART: Set channel %c phase to %f degrees (%.2f radians)", ch_idx == 0 ? 'A' : 'B', phase, current_phase[ch_idx]);
-                // Unified amplitude command: waa / wab
+                
+                // Unified amplitude read command: raa / rab
+                } else if (strncmp(cmd_buf, "ra", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
+                    char response[32];
+                    snprintf(response, sizeof(response), "ra%c%.1f\r\n", 
+                             ch_idx == 0 ? 'a' : 'b', current_ampl[ch_idx] * 100.0f);
+                    uart_write_bytes(UART_NUM, response, strlen(response));
+
+                    // Unified amplitude write command: waa / wab
                 } else if (strncmp(cmd_buf, "wa", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     float ampl = strtof(cmd_buf + 3, NULL);
@@ -195,6 +221,7 @@ static void uart_cmd_task(void *arg) {
                     if (ampl > 100.0f) ampl = 100.0f;
                     target_ampl[ch_idx] = ampl / 100.0f;
                     // ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
+
                 // Shortcut: clear all harmonics for a channel (must come before wh[a|b] command)
                 } else if ((strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'a') ||
                            (strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'b')) {
@@ -205,7 +232,24 @@ static void uart_cmd_task(void *arg) {
                         harmonics[ch_idx][i].phase = 0.0f;
                     }
                     // ESP_LOGI(TAG, "UART: Cleared all harmonics for channel %c", ch_idx == 0 ? 'A' : 'B');
-                // Unified harmonic injection: wha / whb
+
+                // Unified harmonic read command: rha / rhb
+                } else if (strncmp(cmd_buf, "rh", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
+                    int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
+                    char response[256];
+                    snprintf(response, sizeof(response), "rh%c", ch_idx == 0 ? 'a' : 'b');
+                    for (int i = 0; i < MAX_HARMONICS; ++i) {
+                        if (harmonics[ch_idx][i].order >= 3 && harmonics[ch_idx][i].percent > 0.0f) {
+                            snprintf(response + strlen(response), sizeof(response) - strlen(response),
+                                     "%d,%.1f,%.1f;", harmonics[ch_idx][i].order,
+                                     harmonics[ch_idx][i].percent * 100.0f,
+                                     harmonics[ch_idx][i].phase * 180.0f / M_PI);
+                        }
+                    }
+                    strcat(response, "\r\n");
+                    uart_write_bytes(UART_NUM, response, strlen(response));
+
+                // Unified harmonic write command: wha / whb
                 } else if (strncmp(cmd_buf, "wh", 2) == 0 && (cmd_buf[2] == 'a' || cmd_buf[2] == 'b')) {
                     int ch_idx = (cmd_buf[2] == 'a') ? 0 : 1;
                     int order = 0;
@@ -267,14 +311,28 @@ static void uart_cmd_task(void *arg) {
                     }
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
-                        "Commands:\r\n"
-                        "  wf[a|b]<freq>   Set channel A or B frequency in Hz (e.g. wfa1000.5, wfb50.1, decimals supported)\r\n"
-                        "  wp[a|b]<deg>    Set channel A or B phase in degrees (e.g. wpa90, wpb-90, range -360 to +360)\r\n"
-                        "  wa[a|b]<ampl>   Set channel A or B amplitude (0-100, e.g. waa50, wab80)\r\n"
-                        "  wh[a|b]<order>,<pct>[,<phase>] Mix odd harmonic to channel A or B (e.g. wha3,10 or whb5,20,45)\r\n"
-                        "  whcl[a|b]         Remove all harmonics from channel A or B (e.g. whcla, whclb)\r\n"
-                        "  help            Show this help message\r\n";
-                    uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));   
+                        "Command: [r|w][f|p|a|h][a|b][<args>]\r\n"
+                        "  r=read, w=write; f=frequency, p=phase, a=amplitude, h=harmonic\r\n"
+                        "  a=ch A, b=ch B; <args>=value(s) for write\r\n"
+                        "\r\n"
+                        "Harmonic: wh[a|b]<n>,<percent>[,<phase_deg>]\r\n"
+                        "  n=odd harmonic (>=3), percent=0-100, phase_deg=deg (optional)\r\n"
+                        "Special:\r\n"
+                        "  whcl[a|b]   Clear all harmonics for A/B\r\n"
+                        "  help        Show this help\r\n"
+                        "\r\n"
+                        "Examples:\r\n"
+                        "  rfa         Read freq A (ex. response rfa50.0 = 50.0 Hz)\r\n"
+                        "  wfb45.5     Set freq B to 45.5 Hz\r\n"
+                        "  rpa         Read phase A (ex. response rpa-120.0 = -120.0 deg)\r\n"
+                        "  wpa-90      Set phase A to -90 deg\r\n"
+                        "  rab         Read amp B (ex. response rab55.0 = 55.0 %)\r\n"
+                        "  waa50       Set amp A to 50%\r\n"
+                        "  rha         Read harmonics A (ex. response rha3,10.0,0.0;5,20.0,-90.0; = 3rd 10% 0 deg; 5th 20% -90 deg)\r\n"
+                        "  wha3,10     Set 3rd harm A to 10%\r\n"
+                        "  whb5,5,-90  Set 5th harm B to 5%, -90 deg\r\n";
+
+                    uart_write_bytes(UART_NUM, help_msg, strlen(help_msg));
                 } else if (cmd_pos > 0) {
                     ESP_LOGW(TAG, "UART: Unknown command: '%s'", cmd_buf);
                 }
