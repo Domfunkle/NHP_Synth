@@ -21,7 +21,7 @@
 #define SQUARE_WAVE_INPUT 19
 #define SQUARE_WAVE_HZ 50
 #define PERIOD_US 50         // period in microseconds for DDS output
-#define AMPL_RAMP_STEP 5e-5 // Adjust for ramp speed (smaller = slower)
+#define AMPL_RAMP_STEP 1e-4 // Adjust for ramp speed (smaller = slower)
 #define MAX_HARMONICS 8 // Maximum harmonics across both channels
 #define PHASE_SCALE (int)(TABLE_SIZE / (2.0 * M_PI))
 #define M_PI_180 (M_PI / 180.0f)
@@ -497,6 +497,6 @@ void app_main(void) {
     
     global_gpio_init();
     // ESP_LOGI(TAG, "Starting DAC DDS generator. Type 'help' in UART for usage. Frequency range: %d-%d Hz.", MIN_FREQ, MAX_FREQ);
-    xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 4096, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 8192, NULL, 5, NULL, 1);
     start_dds_timer(PERIOD_US);
 }
