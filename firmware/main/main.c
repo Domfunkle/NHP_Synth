@@ -497,6 +497,6 @@ void app_main(void) {
     
     global_gpio_init();
     // ESP_LOGI(TAG, "Starting DAC DDS generator. Type 'help' in UART for usage. Frequency range: %d-%d Hz.", MIN_FREQ, MAX_FREQ);
-    xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 4096, NULL, 5, NULL, 0);
+    xTaskCreatePinnedToCore(uart_cmd_task, "uart_cmd_task", 4096, NULL, 5, NULL, 1);
     start_dds_timer(PERIOD_US);
 }
