@@ -25,6 +25,7 @@ class EncoderManager:
         self.button_hold_time = {k: None for k in encoders}
         self.was_held = {k: False for k in encoders}
         self.selection_mode = {k: {'synth': 'all', 'ch': 'all'} for k in encoders}
+        self.state.selection_mode = self.selection_mode  # Share selection mode with state manager
 
     # --- Public interface ---
     def update(self):

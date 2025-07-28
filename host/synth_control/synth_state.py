@@ -10,6 +10,7 @@ class SynthStateManager:
         self.defaults = self.load_defaults()
         self.num_synths = 0
         self.synths = []  # List of synth dicts, one per synth
+        self.selection_mode = None
 
     def get_defaults(self, idx, key):
         if idx < len(self.defaults):

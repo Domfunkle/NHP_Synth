@@ -1,4 +1,3 @@
-
 import os
 import json
 import datetime
@@ -150,8 +149,12 @@ def create_app(command_queue, state_manager):
         while True:
             try:
                 current_state = copy.deepcopy(getattr(state_manager, 'synths', []))
+                selection_mode = getattr(state_manager, 'selection_mode', None)
+                emit_payload = {'synths': current_state}
+                if selection_mode is not None:
+                    emit_payload['selection_mode'] = selection_mode
                 if last_state is None or json.dumps(current_state, sort_keys=True) != json.dumps(last_state, sort_keys=True):
-                    socketio.emit('synth_state', {'synths': current_state})
+                    socketio.emit('synth_state', emit_payload)
                     last_state = current_state
             except Exception:
                 pass
@@ -164,7 +167,11 @@ def create_app(command_queue, state_manager):
     def handle_connect():
         try:
             current_state = copy.deepcopy(getattr(state_manager, 'synths', []))
-            socketio.emit('synth_state', {'synths': current_state})
+            selection_mode = getattr(state_manager, 'selection_mode', None)
+            emit_payload = {'synths': current_state}
+            if selection_mode is not None:
+                emit_payload['selection_mode'] = selection_mode
+            socketio.emit('synth_state', emit_payload)
         except Exception:
             pass
 
