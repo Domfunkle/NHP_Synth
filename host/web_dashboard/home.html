@@ -13,10 +13,7 @@
 
 <body>
     <script type="module">
-        import {
-            apiPost,
-            setSynthAmplitude,
-            setSynthFrequency,
+        import { apiPost, setSynthAmplitude, setSynthFrequency,
             setSynthPhase,
             setSynthHarmonics,
             sendSynthCommand,
@@ -33,18 +30,17 @@
 
 
         // --- State & Formatting ---
-        const AppState = {
-            synthstate: null,
-        };
+        import { AppState, setSynthState, setOpenAccordionId, setOpenOffcanvasId, getSynthState, getOpenAccordionId, getOpenOffcanvasId } from './static/js/state.js';
 
         // --- Offcanvas Increment/Decrement Handlers ---
         // These will be attached to window so they can be called from inline HTML
         window.incrementVoltage = async function(idx, delta) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('incrementVoltage: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('incrementVoltage: synth.id is undefined for idx', idx, synth);
                 return;
@@ -58,11 +54,12 @@
         };
         // Direct set handler for voltage
         window.setVoltageDirect = async function(idx, value) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('setVoltageDirect: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('setVoltageDirect: synth.id is undefined for idx', idx, synth);
                 return;
@@ -75,11 +72,12 @@
             await setSynthAmplitude(synth.id, 'a', percent);
         };
         window.incrementCurrent = async function(idx, delta) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('incrementCurrent: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('incrementCurrent: synth.id is undefined for idx', idx, synth);
                 return;
@@ -92,11 +90,12 @@
         };
         // Direct set handler for current
         window.setCurrentDirect = async function(idx, value) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('setCurrentDirect: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('setCurrentDirect: synth.id is undefined for idx', idx, synth);
                 return;
@@ -109,11 +108,12 @@
             await setSynthAmplitude(synth.id, 'b', percent);
         };
         window.incrementPhase = async function(idx, delta) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('incrementPhase: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('incrementPhase: synth.id is undefined for idx', idx, synth);
                 return;
@@ -125,11 +125,12 @@
         };
         // Direct set handler for phase
         window.setPhaseDirect = async function(idx, value) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('setPhaseDirect: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('setPhaseDirect: synth.id is undefined for idx', idx, synth);
                 return;
@@ -141,11 +142,12 @@
             await setSynthPhase(synth.id, 'a', v);
         };
         window.incrementFrequency = async function(idx, delta) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('incrementFrequency: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('incrementFrequency: synth.id is undefined for idx', idx, synth);
                 return;
@@ -157,11 +159,12 @@
         };
         // Direct set handler for frequency
         window.setFrequencyDirect = async function(idx, value) {
-            if (!AppState.synthstate || !AppState.synthstate.synths || !AppState.synthstate.synths[idx]) {
+            const synthState = getSynthState();
+            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
                 console.error('setFrequencyDirect: synth is undefined for idx', idx);
                 return;
             }
-            const synth = AppState.synthstate.synths[idx];
+            const synth = synthState.synths[idx];
             if (typeof synth.id === 'undefined') {
                 console.error('setFrequencyDirect: synth.id is undefined for idx', idx, synth);
                 return;
@@ -175,8 +178,8 @@
 
 
         // --- Accordion & Offcanvas State Persistence ---
-        AppState.openAccordionId = null;
-        AppState.openOffcanvasId = null;
+        setOpenAccordionId(null);
+        setOpenOffcanvasId(null);
 
         // Listen for accordion and offcanvas open/close events
         function setupAccordionListeners() {
@@ -184,11 +187,11 @@
             if (accordion) {
                 accordion.querySelectorAll('.accordion-collapse').forEach(collapse => {
                     collapse.addEventListener('show.bs.collapse', function () {
-                        AppState.openAccordionId = this.id;
+                        setOpenAccordionId(this.id);
                     });
                     collapse.addEventListener('hide.bs.collapse', function () {
-                        if (AppState.openAccordionId === this.id) {
-                            AppState.openAccordionId = null;
+                        if (getOpenAccordionId() === this.id) {
+                            setOpenAccordionId(null);
                         }
                     });
                 });
@@ -196,11 +199,11 @@
             // Offcanvas listeners
             document.querySelectorAll('.offcanvas').forEach(offcanvas => {
                 offcanvas.addEventListener('show.bs.offcanvas', function () {
-                    AppState.openOffcanvasId = this.id;
+                    setOpenOffcanvasId(this.id);
                 });
                 offcanvas.addEventListener('hide.bs.offcanvas', function () {
-                    if (AppState.openOffcanvasId === this.id) {
-                        AppState.openOffcanvasId = null;
+                    if (getOpenOffcanvasId() === this.id) {
+                        setOpenOffcanvasId(null);
                     }
                 });
             });
