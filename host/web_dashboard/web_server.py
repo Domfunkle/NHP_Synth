@@ -146,6 +146,7 @@ def create_app(command_queue, state_manager):
     # Background task to emit synth state on change
     def emit_synth_state():
         last_state = None
+        last_selection_mode = None
         while True:
             try:
                 current_state = copy.deepcopy(getattr(state_manager, 'synths', []))
@@ -153,9 +154,12 @@ def create_app(command_queue, state_manager):
                 emit_payload = {'synths': current_state}
                 if selection_mode is not None:
                     emit_payload['selection_mode'] = selection_mode
-                if last_state is None or json.dumps(current_state, sort_keys=True) != json.dumps(last_state, sort_keys=True):
+                state_changed = last_state is None or json.dumps(current_state, sort_keys=True) != json.dumps(last_state, sort_keys=True)
+                selection_mode_changed = last_selection_mode is None or json.dumps(selection_mode, sort_keys=True) != json.dumps(last_selection_mode, sort_keys=True)
+                if state_changed or selection_mode_changed:
                     socketio.emit('synth_state', emit_payload)
                     last_state = current_state
+                    last_selection_mode = copy.deepcopy(selection_mode)
             except Exception:
                 pass
             time.sleep(0.1)
