@@ -13,7 +13,10 @@
 
 <body>
     <script type="module">
-        import { apiPost, setSynthAmplitude, setSynthFrequency,
+        import { 
+            apiPost,
+            setSynthAmplitude,
+            setSynthFrequency,
             setSynthPhase,
             setSynthHarmonics,
             sendSynthCommand,
@@ -30,151 +33,37 @@
 
 
         // --- State & Formatting ---
-        import { AppState, setSynthState, setOpenAccordionId, setOpenOffcanvasId, getSynthState, getOpenAccordionId, getOpenOffcanvasId } from './static/js/state.js';
+        import { 
+            AppState,
+            setSynthState,
+            setOpenAccordionId,
+            setOpenOffcanvasId,
+            getSynthState,
+            getOpenAccordionId,
+            getOpenOffcanvasId
+        } from './static/js/state.js';
 
         // --- Offcanvas Increment/Decrement Handlers ---
-        // These will be attached to window so they can be called from inline HTML
-        window.incrementVoltage = async function(idx, delta) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('incrementVoltage: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('incrementVoltage: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            const VOLTAGE_RMS_MAX = 240;
-            let value = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX + delta;
-            value = Math.max(0, Math.min(VOLTAGE_RMS_MAX, value));
-            // Convert back to percent
-            const percent = +(value / VOLTAGE_RMS_MAX * 100).toFixed(2);
-            await setSynthAmplitude(synth.id, 'a', percent);
-        };
-        // Direct set handler for voltage
-        window.setVoltageDirect = async function(idx, value) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('setVoltageDirect: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('setVoltageDirect: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            const VOLTAGE_RMS_MAX = 240;
-            let v = parseFloat(value);
-            if (isNaN(v)) return;
-            v = Math.max(0, Math.min(VOLTAGE_RMS_MAX, v));
-            const percent = +(v / VOLTAGE_RMS_MAX * 100).toFixed(2);
-            await setSynthAmplitude(synth.id, 'a', percent);
-        };
-        window.incrementCurrent = async function(idx, delta) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('incrementCurrent: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('incrementCurrent: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            const CURRENT_RMS_MAX = 10;
-            let value = (synth.amplitude_b / 100) * CURRENT_RMS_MAX + delta;
-            value = Math.max(0, Math.min(CURRENT_RMS_MAX, value));
-            const percent = +(value / CURRENT_RMS_MAX * 100).toFixed(2);
-            await setSynthAmplitude(synth.id, 'b', percent);
-        };
-        // Direct set handler for current
-        window.setCurrentDirect = async function(idx, value) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('setCurrentDirect: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('setCurrentDirect: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            const CURRENT_RMS_MAX = 10;
-            let v = parseFloat(value);
-            if (isNaN(v)) return;
-            v = Math.max(0, Math.min(CURRENT_RMS_MAX, v));
-            const percent = +(v / CURRENT_RMS_MAX * 100).toFixed(2);
-            await setSynthAmplitude(synth.id, 'b', percent);
-        };
-        window.incrementPhase = async function(idx, delta) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('incrementPhase: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('incrementPhase: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            let value = synth.phase_a + delta;
-            value = ((value % 360) + 360) % 360;
-            value = +value.toFixed(2);
-            await setSynthPhase(synth.id, 'a', value);
-        };
-        // Direct set handler for phase
-        window.setPhaseDirect = async function(idx, value) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('setPhaseDirect: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('setPhaseDirect: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            let v = parseFloat(value);
-            if (isNaN(v)) return;
-            v = ((v % 360) + 360) % 360;
-            v = +v.toFixed(2);
-            await setSynthPhase(synth.id, 'a', v);
-        };
-        window.incrementFrequency = async function(idx, delta) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('incrementFrequency: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('incrementFrequency: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            let value = synth.frequency_a + delta * 1;
-            value = Math.max(0, value);
-            value = +value.toFixed(2);
-            await setSynthFrequency(synth.id, 'a', value);
-        };
-        // Direct set handler for frequency
-        window.setFrequencyDirect = async function(idx, value) {
-            const synthState = getSynthState();
-            if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-                console.error('setFrequencyDirect: synth is undefined for idx', idx);
-                return;
-            }
-            const synth = synthState.synths[idx];
-            if (typeof synth.id === 'undefined') {
-                console.error('setFrequencyDirect: synth.id is undefined for idx', idx, synth);
-                return;
-            }
-            let v = parseFloat(value);
-            if (isNaN(v)) return;
-            v = Math.max(0, v);
-            v = +v.toFixed(2);
-            await setSynthFrequency(synth.id, 'a', v);
-        };
+        // Import and attach event handlers to window for inline HTML usage
+        import {
+            incrementVoltage,
+            setVoltageDirect,
+            incrementCurrent,
+            setCurrentDirect,
+            incrementPhase,
+            setPhaseDirect,
+            incrementFrequency,
+            setFrequencyDirect
+        } from './static/js/synthHandlers.js';
+
+        window.incrementVoltage = incrementVoltage;
+        window.setVoltageDirect = setVoltageDirect;
+        window.incrementCurrent = incrementCurrent;
+        window.setCurrentDirect = setCurrentDirect;
+        window.incrementPhase = incrementPhase;
+        window.setPhaseDirect = setPhaseDirect;
+        window.incrementFrequency = incrementFrequency;
+        window.setFrequencyDirect = setFrequencyDirect;
 
 
         // --- Accordion & Offcanvas State Persistence ---
