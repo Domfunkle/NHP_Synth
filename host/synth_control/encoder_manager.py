@@ -26,11 +26,20 @@ class EncoderManager:
         self.was_held = {k: False for k in encoders}
         self.selection_mode = {k: {'synth': 'all', 'ch': 'all'} for k in encoders}
         self.state.selection_mode = self.selection_mode  # Share selection mode with state manager
+        self.selection_mode_last_changed = {k: time.time() for k in encoders}  # Track last change time for each func
 
     # --- Public interface ---
     def update(self):
-        """Call this in your main loop to process all encoders."""
+        """Call this in your main loop to process all encoders and handle selection_mode timeout."""
         now = time.time()
+        # Timeout logic for selection_mode
+        for func in self.selection_mode:
+            last_changed = self.selection_mode_last_changed.get(func, now)
+            if now - last_changed > 60:
+                if self.selection_mode[func] != {'synth': 'all', 'ch': 'all'}:
+                    self.selection_mode[func] = {'synth': 'all', 'ch': 'all'}
+                    self.selection_mode_last_changed[func] = now
+                    logger.info(f"Selection mode for {func} timed out, reverted to all/all")
         for func, encoder in self.encoders.items():
             # Handle rotation
             delta = encoder.delta
@@ -54,7 +63,8 @@ class EncoderManager:
                     self.was_held[func] = False
 
     def on_rotate(self, func, delta):
-        """Handle rotation for each encoder based on its own selection_mode and func."""
+        """Handle rotation for each encoder based on its own selection_mode and func. Reset inactivity timer."""
+        self.selection_mode_last_changed[func] = time.time()  # Reset inactivity timer on rotation
         mode = self.selection_mode.get(func, {'synth': 'all', 'ch': 'all'})
         handler_map = {
             'voltage': self._handle_voltage,
@@ -69,6 +79,7 @@ class EncoderManager:
     def on_press(self, func):
         """Handle short button press for each encoder: cycle selection modes for that encoder only."""
         logger.info(f"{func}: Button pressed (cycle selection mode)")
+        self.selection_mode_last_changed[func] = time.time()  # Update last changed time
         self.encoders[func].set_pixel((0, 0, 255))
         time.sleep(0.1)
         self.encoders[func].set_pixel(self.led_colors[func])
