@@ -4,38 +4,78 @@ import logging
 logger = logging.getLogger("NHP_Synth")
 
 class SynthStateManager:
-    def __init__(self, state_file, defaults_list):
+    def __init__(self, state_file, defaults_file):
         self.state_file = state_file
-        self.defaults_list = defaults_list
+        self.defaults_file = defaults_file
+        self.defaults = self.load_defaults()
+        self.num_synths = 0
+        self.synths = []  # List of synth dicts, one per synth
 
-    def get_default_for_synth(self, idx, key):
-        if idx < len(self.defaults_list):
-            return self.defaults_list[idx].get(key, self.defaults_list[0].get(key, 0.0))
-        return self.defaults_list[0].get(key, 0.0)
+    def get_defaults(self, idx, key):
+        if idx < len(self.defaults):
+            return self.defaults[idx].get(key, self.defaults[0].get(key, 0.0))
+        return self.defaults[0].get(key, 0.0)
 
-    def save_synth_state(self, num_synths, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b):
-        """Save synth/channel values to JSON file"""
-        state = []
-        for i in range(num_synths):
-            synth_state = {
-                'amplitude_a': round(float(amplitude_a[i]), 2),
-                'amplitude_b': round(float(amplitude_b[i]), 2),
-                'frequency_a': round(float(frequency_a[i]), 2),
-                'frequency_b': round(float(frequency_b[i]), 2),
-                'phase_a': round(float(phase_a[i]), 2),
-                'phase_b': round(float(phase_b[i]), 2),
-                'harmonics_a': harmonics_a[i],
-                'harmonics_b': harmonics_b[i]
-            }
-            state.append(synth_state)
+    def _return_defaults(self):
+        """Save and Return the default synths configuration."""
+        self.save_defaults()
+        return self.defaults
+
+    def save_defaults(self):
+        """Save the defaults to the defaults JSON file."""
+        try:
+            with open(self.defaults_file, 'w') as f:
+                json.dump(self.defaults, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Could not save defaults: {e}")
+
+    def load_defaults(self):
+        """Load defaults from the defaults JSON file, or use hardcoded defaults if file does not exist."""
+        default_data = {}
+        for i in range(3):
+            default_data.setdefault("synths", []).append({
+                "amplitude_a": 100.0,
+                "amplitude_b": 50.0,
+                "frequency_a": 50.0,
+                "frequency_b": 50.0,
+                "phase_a": 0.0 if i == 0 else (120.0 if i == 1 else -120.0),
+                "phase_b": 0.0 if i == 0 else (120.0 if i == 1 else -120.0),
+                "harmonics_a": [
+                    {"order": 3, "amplitude": 0, "phase": 0},
+                    {"order": 5, "amplitude": 0, "phase": 0}
+                ],
+                "harmonics_b": [
+                    {"order": 3, "amplitude": 0, "phase": 180},
+                    {"order": 5, "amplitude": 0, "phase": 180}
+                ]
+            })
+
+        if not os.path.exists(self.defaults_file):
+            self.defaults = default_data["synths"]
+            return self._return_defaults()
+        try:
+            with open(self.defaults_file, 'r') as f:
+                data = json.load(f)
+            # If file exists but is missing 'synths', use hardcoded
+            if not isinstance(data, dict) or "synths" not in data:
+                self.defaults = default_data["synths"]
+                return self._return_defaults()
+            return data["synths"]
+        except Exception as e:
+            logger.warning(f"Could not load defaults: {e}")
+            self.defaults = default_data["synths"]
+            return self._return_defaults()
+
+    def save_state(self):
+        """Save the current synth/channel values to JSON file."""
         try:
             with open(self.state_file, 'w') as f:
-                json.dump({'num_synths': num_synths, 'synths': state}, f, indent=2)
+                json.dump({'num_synths': self.num_synths, 'synths': self.synths}, f, indent=2)
         except Exception as e:
             logger.warning(f"Could not save synth state: {e}")
 
-    def load_synth_state(self):
-        """Load synth/channel values from JSON file, or return None if not found"""
+    def load_state(self):
+        """Load synth/channel values from JSON file, update internal state, and return the state dict."""
         if not os.path.exists(self.state_file):
             return None
         try:
@@ -43,7 +83,10 @@ class SynthStateManager:
                 state = json.load(f)
             if 'num_synths' not in state or 'synths' not in state:
                 return None
-            for synth in state['synths']:
+            self.num_synths = state['num_synths']
+            self.synths = state['synths']
+            # Ensure harmonics lists are lists
+            for synth in self.synths:
                 for key in ['harmonics_a', 'harmonics_b']:
                     if key not in synth or not isinstance(synth[key], list):
                         synth[key] = []

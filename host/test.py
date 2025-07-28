@@ -7,7 +7,7 @@ import logging
 import json
 import os
 import random
-from synth_control import SynthStateManager, SystemInitializer, EncoderManager, Colors
+from synth_control import SynthStateManager, SystemInitializer, EncoderManager
 
 # Set up logger
 logger = logging.getLogger("NHP_Synth")
@@ -20,16 +20,26 @@ logger.addHandler(handler)
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'synth_state.json')
 DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
 
-# MockButton class for testing
-class MockButton:
-    def __init__(self, value=False):
-        self._value = value
+
+
+# Combined MockEncoder class for testing (position, button, pixel)
+class MockEncoder:
+    def __init__(self, position=0, button_value=True, pixel=None):
+        self.position = position
+        self._button_value = button_value
+        self.pixel = pixel
     @property
-    def value(self):
-        return self._value
-    @value.setter
-    def value(self, v):
-        self._value = v
+    def button(self):
+        class Button:
+            def __init__(self, outer):
+                self._outer = outer
+            @property
+            def value(self):
+                return self._outer._button_value
+            @value.setter
+            def value(self, v):
+                self._outer._button_value = v
+        return Button(self)
 
 def test_encoder_emulation():
     """Test routine to emulate encoder turning and button presses for UI/logging."""
@@ -56,117 +66,118 @@ def test_encoder_emulation():
             'frequency_b': 50.0,
             'phase_a': 0.0,
             'phase_b': 0.0,
-            'harmonics_a': 0.0,
-            'harmonics_b': 0.0
+            'harmonics_a': [
+                {'order': 3, 'amplitude': 0, 'phase': 0},
+                {'order': 5, 'amplitude': 0, 'phase': 0}
+            ],
+            'harmonics_b': [
+                {'order': 3, 'amplitude': 0, 'phase': 180},
+                {'order': 5, 'amplitude': 0, 'phase': 180}
+            ]
         }]
 
     # Instantiate SynthStateManager
-    synth_state_manager = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
-    get_default_for_synth = synth_state_manager.get_default_for_synth
-    save_synth_state = synth_state_manager.save_synth_state
-    load_synth_state = synth_state_manager.load_synth_state
-
-    # Instantiate EncoderManager
-    encoder_manager = EncoderManager(get_default_for_synth, save_synth_state)
+    state = SynthStateManager(STATE_FILE, DEFAULTS_LIST)
+    get_defaults = state.get_defaults
+    load_state = state.load_state
 
     # Initialize system as in main()
-    system = SystemInitializer.initialize_system(
-        get_default_for_synth,
-        save_synth_state,
-        load_synth_state,
-        STATE_FILE
-    )
+    system = SystemInitializer.initialize_system()
     encoders = system['encoders']
-    buttons = {func: MockButton() for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
     pixels = system['pixels']
-    synths = system['synths']
     led_colors = system['led_colors']
-    amplitude_a = system['amplitude_a']
-    amplitude_b = system['amplitude_b']
-    frequency_a = system['frequency_a']
-    frequency_b = system['frequency_b']
-    phase_a = system['phase_a']
-    phase_b = system['phase_b']
-    harmonics_a = system['harmonics_a']
-    harmonics_b = system['harmonics_b']
-    active_synth = system['active_synth']
-    active_channel = system['active_channel']
-    last_positions = system['last_positions']
+    synths = system['synths']
     num_synths = system['num_synths']
-    selection_mode = system['selection_mode']
-    selection_time = system['selection_time']
-    selection_timeout = system['selection_timeout']
 
-    button_pressed = {func: False for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
-    button_press_time = {func: 0 for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']}
-    hold_threshold = 1.0  # Hold for 1 second to trigger reset
+    # Wrap hardware encoders and pixels in Encoder objects using mocks
+    from synth_control.encoder import Encoder
+    from synth_control.encoder_manager import EncoderManager
+    mock_encoder_objs = {}
+    for func in encoders:
+        pos = encoders[func].position if encoders[func] else 0
+        pixel = pixels[func]
+        mock_encoder = MockEncoder(position=pos, button_value=True, pixel=pixel)
+        mock_encoder_objs[func] = Encoder(mock_encoder, pixel)
+    # Pass the shared state to EncoderManager so it can update state directly
+    encoder_manager = EncoderManager(mock_encoder_objs, led_colors, state, synths)
 
-    def read_synth_state(synth, key):
-        try:
-            if key == 'amplitude_a':
-                synth.get_amplitude('a')
-            elif key == 'amplitude_b':
-                synth.get_amplitude('b')
-            elif key == 'frequency':
-                synth.get_frequency('a')
-                synth.get_frequency('b')
-            elif key == 'phase':
-                synth.get_phase('a')
-                synth.get_phase('b')
-            elif key == 'harmonics':
-                synth.get_harmonics('a')
-                synth.get_harmonics('b')
-        except Exception as e:
-            logger.error(f"Error getting state for synth {synth.id} key {key}: {e}")
+    # Load state if available, else use defaults
+    loaded_state = load_state()
+    if loaded_state and loaded_state.get('num_synths', num_synths) == num_synths and isinstance(loaded_state.get('synths'), list):
+        state.num_synths = num_synths
+        # Fill in missing/default values for each synth
+        for i in range(num_synths):
+            if i >= len(state.synths):
+                state.synths.append({})
+            synth = state.synths[i]
+        for key in ['amplitude_a', 'amplitude_b', 'frequency_a', 'frequency_b', 'phase_a', 'phase_b']:
+            synth.setdefault(key, get_defaults(i, key))
+        if 'harmonics_a' not in synth or not isinstance(synth['harmonics_a'], list) or not synth['harmonics_a']:
+            synth['harmonics_a'] = [
+                {'order': 3, 'amplitude': 0, 'phase': 0},
+                {'order': 5, 'amplitude': 0, 'phase': 0}
+            ]
+        if 'harmonics_b' not in synth or not isinstance(synth['harmonics_b'], list) or not synth['harmonics_b']:
+            synth['harmonics_b'] = [
+                {'order': 3, 'amplitude': 0, 'phase': 180},
+                {'order': 5, 'amplitude': 0, 'phase': 180}
+            ]
+        logger.info(f"Loaded synth state from {STATE_FILE}")
+    else:
+        state.num_synths = num_synths
+        state.synths = []
+        for i in range(num_synths):
+            synth = {
+                'amplitude_a': get_defaults(i, 'amplitude_a'),
+                'amplitude_b': get_defaults(i, 'amplitude_b'),
+                'frequency_a': get_defaults(i, 'frequency_a'),
+                'frequency_b': get_defaults(i, 'frequency_b'),
+                'harmonics_a': [
+                    {'order': 3, 'amplitude': 0, 'phase': 0},
+                    {'order': 5, 'amplitude': 0, 'phase': 0}
+                ],
+                'harmonics_b': [
+                    {'order': 3, 'amplitude': 0, 'phase': 180},
+                    {'order': 5, 'amplitude': 0, 'phase': 180}
+                ],
+                'phase_a': get_defaults(i, 'phase_a'),
+                'phase_b': get_defaults(i, 'phase_b'),
+            }
+            state.synths.append(synth)
+    # Save initial state
+    state.save_state()
 
-    # Simulate encoder rotations multiple times
-    for key in last_positions:
-        # Randomly pick a key from last_positions and simulate a rotation
-        last_positions[key] += random.choice([-5, 5])  # Randomly increase or decrease position
-        encoder_manager.handle_encoder_rotation(
-            encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
-            harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
-        )
+    # Systematically test each encoder: rotate forward, backward, press, repeat for each selection mode
+    for func, encoder in mock_encoder_objs.items():
+        logger.info(f"\n--- Testing encoder: {func} ---")
+        # For each selection mode (cycle through twice)
+        for cycle in range(num_synths * 3 - 1):
+            # Rotate forward
+            logger.info(f"\nCycle {cycle + 1}: Rotating {func} forward")
+            encoder._last_position += random.randint(1, 10)  # Simulate rotation
+            encoder._encoder._button_value = True  # Not pressed
+            encoder_manager.update()
+            print(state.synths[0])  # Print state of first synth for debugging
+            
+            # Rotate backward
+            logger.info(f"\nCycle {cycle + 1}: Rotating {func} backward")
+            encoder._last_position -= random.randint(1, 10)  # Simulate rotation
+            encoder._encoder._button_value = True  # Not pressed
+            encoder_manager.update()
+            print(state.synths[0])  # Print state of first synth for debugging
 
-        for synth in synths:
-            read_synth_state(synth, key)
-        
-    # Simulate button presses and then rotations
-    for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
-        # Simulate button press
-        button_pressed[func] = True
-        button_press_time[func] = time.time()
-        encoder_manager.handle_encoder_buttons(
-            encoders, buttons, pixels, synths, button_pressed, button_press_time, hold_threshold, led_colors,
-            amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
-            active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout
-        )
-        button_pressed[func] = False
-        # rotate the encoder after button press
-        last_positions[func] += random.choice([-5, 5])
-        encoder_manager.handle_encoder_rotation(
-            encoders, synths, last_positions, amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b,
-            harmonics_a, harmonics_b, active_synth, active_channel, num_synths, selection_mode
-        )
-        
-        for synth in synths:
-            read_synth_state(synth, func)
+            # Press button (simulate short press)
+            logger.info(f"\nCycle {cycle + 1}: Pressing {func} button")
+            encoder._encoder._button_value = False  # Pressed
+            encoder_manager.update()
+            time.sleep(0.1)
+            encoder._encoder._button_value = True  # Release
+            encoder_manager.update()
+            print(state.synths[0])  # Print state of first synth for debugging
 
-    # Go through each button, set the selection_mode to 'all' and simulate a button hold beyond the threshold
-    for func in ['amplitude_a', 'amplitude_b', 'frequency', 'phase', 'harmonics']:
-        selection_mode[func] = 'all'
-        button_pressed[func] = True
-        buttons[func].value = False
-        encoder_manager.was_held[func] = True
-        button_press_time[func] = time.time() - hold_threshold - 1.0 # Simulate hold beyond threshold
-        encoder_manager.handle_encoder_buttons(
-            encoders, buttons, pixels, synths, button_pressed, button_press_time, hold_threshold, led_colors,
-            amplitude_a, amplitude_b, frequency_a, frequency_b, phase_a, phase_b, harmonics_a, harmonics_b,
-            active_synth, active_channel, num_synths, selection_mode, selection_time, selection_timeout
-        )
+    # Final save of state
+    state.save_state()
 
-        for synth in synths:
-            read_synth_state(synth, func)
 
 if __name__ == '__main__':
     test_encoder_emulation()

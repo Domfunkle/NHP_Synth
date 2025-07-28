@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html data-bs-theme="dark">
+
+<head>
+    <title>NHP Synth Home</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=800, height=480, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="static/bootstrap.min.css">
+    <script src="static/socket.io.min.js"></script>
+    <script src="static/bootstrap.bundle.min.js"></script>
+    <script src="static/chart.umd.min.js"></script>
+</head>
+
+<body>
+    <script>
+
+        // --- Waveform Chart Component ---
+        /**
+         * Render both voltage and current waveforms using Chart.js for a given synth.
+         * @param {object} synth - The synth object
+         * @param {string} canvasId - The id of the canvas element to render into
+         */
+        function CombinedWaveformChart(synth, canvasId) {
+            // Get parameters for both channels
+            const amplitudeA = synth.amplitude_a, frequencyA = synth.frequency_a, phaseA = synth.phase_a;
+            const amplitudeB = synth.amplitude_b, frequencyB = synth.frequency_b, phaseB = synth.phase_b;
+            if ([amplitudeA, frequencyA, phaseA, amplitudeB, frequencyB, phaseB].some(v => v === undefined)) return;
+
+            // --- Scaling factors (configurable later) ---
+            const VOLTAGE_RMS_MAX = 240; // Vrms
+            const CURRENT_RMS_MAX = 10;  // Arms
+
+            // Scale amplitude from 0-100% to 0-240Vrms and 0-10Arms (RMS values)
+            const scaledAmplitudeA = (amplitudeA / 100) * VOLTAGE_RMS_MAX;
+            const scaledAmplitudeB = (amplitudeB / 100) * CURRENT_RMS_MAX;
+
+            // The waveform peak is sqrt(2) * RMS
+            const sqrt2 = Math.sqrt(2);
+            const peakAmplitudeA = sqrt2 * scaledAmplitudeA;
+            const peakAmplitudeB = sqrt2 * scaledAmplitudeB;
+
+            // Generate waveform data (2 cycles, 200 points)
+            const cycles = 2;
+            const N = 200;
+            const x = Array.from({ length: (N * cycles) }, (_, i) => i / N); // 0 to 2
+            // Helper to sum harmonics for a channel
+            function sumHarmonics(t, peak, phase, harmonics) {
+                // Fundamental
+                let y = peak * Math.sin(2 * Math.PI * t + (phase * Math.PI / 180));
+                // Harmonics (array of {order, amplitude, phase})
+                if (Array.isArray(harmonics)) {
+                    harmonics.forEach(h => {
+                        // Harmonic amplitude is percent of fundamental RMS, so scale to peak
+                        const harmPeak = peak * (h.amplitude / 100);
+                        y += harmPeak * Math.sin(2 * Math.PI * h.order * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
+                    });
+                }
+                return y;
+            }
+
+            const yA = x.map(t => sumHarmonics(t, peakAmplitudeA, phaseA, synth.harmonics_a));
+            const yB = x.map(t => sumHarmonics(t, peakAmplitudeB, phaseB, synth.harmonics_b));
+
+            // Axis limits
+            const voltageMax = sqrt2 * VOLTAGE_RMS_MAX * 1.1; // 10% margin
+            const currentMax = sqrt2 * CURRENT_RMS_MAX * 1.1; // 10% margin
+
+            // Render chart with dual y-axes
+            const ctx = document.getElementById(canvasId)?.getContext('2d');
+            if (!ctx) return;
+            if (window[canvasId + '_chart']) {
+                window[canvasId + '_chart'].destroy();
+            }
+            window[canvasId + '_chart'] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: x.map(t => (t * 180).toFixed(0)), // 0 to 360*2 deg
+                    datasets: [
+                        {
+                            label: 'Voltage',
+                            data: yA,
+                            borderColor: '#0dcaf0',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.2,
+                            yAxisID: 'yV',
+                        },
+                        {
+                            label: 'Current',
+                            data: yB,
+                            borderColor: '#ffc107',
+                            borderWidth: 2,
+                            pointRadius: 0,
+                            fill: false,
+                            tension: 0.2,
+                            yAxisID: 'yI',
+                        }
+                    ]
+                },
+                options: {
+                    responsive: false,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        yV: {
+                            display: false,
+                            position: 'left',
+                            min: -voltageMax,
+                            max: voltageMax,
+                            title: { display: false, text: 'Voltage (V)' },
+                            grid: { drawOnChartArea: false },
+                        },
+                        yI: {
+                            display: false,
+                            position: 'right',
+                            min: -currentMax,
+                            max: currentMax,
+                            title: { display: false, text: 'Current (A)' },
+                            grid: { drawOnChartArea: false },
+                        }
+                    }
+                }
+            });
+        }
+        // --- API/Utility Functions ---
+        async function apiPost(endpoint, data) {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`POST ${endpoint} failed: ${response.status} ${errorText}`);
+            }
+            return await response.json();
+        }
+
+
+        // --- Synth Command Helper Functions ---
+        /**
+         * Set amplitude for a synth channel
+         * @param {number} synthId
+         * @param {string} channel - 'a' or 'b'
+         * @param {number} value
+         */
+        async function setSynthAmplitude(synthId, channel, value) {
+            return apiPost(`/api/synths/${synthId}/amplitude`, { channel, value });
+        }
+
+        /**
+         * Set frequency for a synth channel
+         * @param {number} synthId
+         * @param {string} channel - 'a' or 'b'
+         * @param {number} value
+         */
+        async function setSynthFrequency(synthId, channel, value) {
+            return apiPost(`/api/synths/${synthId}/frequency`, { channel, value });
+        }
+
+        /**
+         * Set phase for a synth channel
+         * @param {number} synthId
+         * @param {string} channel - 'a' or 'b'
+         * @param {number} value
+         */
+        async function setSynthPhase(synthId, channel, value) {
+            return apiPost(`/api/synths/${synthId}/phase`, { channel, value });
+        }
+
+        /**
+         * Set harmonics for a synth channel
+         * @param {number} synthId
+         * @param {string} channel - 'a' or 'b'
+         * @param {number[]|string} value - array of floats or comma-separated string
+         */
+        async function setSynthHarmonics(synthId, channel, value) {
+            return apiPost(`/api/synths/${synthId}/harmonics`, { channel, value });
+        }
+
+        /**
+         * Send a generic command to a synth (advanced)
+         * @param {number} synthId
+         * @param {string} command - e.g. 'set_phase', 'set_amplitude', etc.
+         * @param {string} channel
+         * @param {number|Array|String} value
+         */
+        async function sendSynthCommand(synthId, command, channel, value) {
+            return apiPost(`/api/synths/${synthId}/command`, { command, channel, value });
+        }
+
+        // --- State & Formatting ---
+        const AppState = {
+            synthstate: null,
+        };
+
+        function getGlobalFrequencyHz() {
+            if (AppState.synthstate && Array.isArray(AppState.synthstate.synths) && AppState.synthstate.synths.length > 0) {
+                const freq = AppState.synthstate.synths[0].frequency_a;
+                return (freq !== undefined && freq !== null) ? freq : null;
+            }
+            return null;
+        }
+
+        // --- UI Components ---
+
+        function renderHarmonics(harmonics) {
+            // Always render 4 <td> cells per row, fill with '--' if not enough harmonics
+            let cells = [];
+            if (Array.isArray(harmonics) && harmonics.length > 0) {
+                const sorted = harmonics.slice().sort((a, b) => a.order - b.order);
+                for (let i = 0; i < 4; i++) {
+                    if (sorted[i]) {
+                        cells.push(`<td class="text-start small py-0">H${sorted[i].order}</td><td class="text-end small py-0">${sorted[i].amplitude}%</td><td class="text-end small py-0">${sorted[i].phase}&deg;</td>`);
+                    } else {
+                        cells.push('<td class="text-start small py-0">--</td><td class="text-end small py-0">--</td><td class="text-end small py-0">--</td>');
+                    }
+                }
+            } else {
+                for (let i = 0; i < 4; i++) {
+                    cells.push('<td class="text-start small py-0">--</td><td class="text-end small py-0">--</td><td class="text-end small py-0">--</td>');
+                }
+            }
+            // Each row is a single harmonic (3 cells), so group every 3 cells into a row
+            let rows = [];
+            for (let i = 0; i < 4; i++) {
+                rows.push(`<tr>${cells[i]}</tr>`);
+            }
+            return rows.join('');
+        }
+
+        function SynthAccordionItem({ synth, idx, phaseLabel }) {
+            const phase = phaseLabel || `L${idx + 1}`;
+            const freqDisplay = `${getGlobalFrequencyHz()} Hz`;
+            const chartCanvasId = `waveform_combined_${idx}`;
+            const VOLTAGE_RMS_MAX = 240;
+            const CURRENT_RMS_MAX = 10;
+            const scaledAmplitudeA = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX;
+            const scaledAmplitudeB = (synth.amplitude_b / 100) * CURRENT_RMS_MAX;
+            const collapseId = `collapseSynth${idx}`;
+            const headingId = `headingSynth${idx}`;
+            // Offcanvas IDs must be unique per synth
+            const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
+            // Use offcanvas-start for left sidebar
+            // Add data-bs-backdrop="false" to all offcanvas elements
+            return `
+                <div class="accordion-item bg-transparent border-0">
+                    <h2 class="accordion-header" id="${headingId}">
+                        <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
+                            <div class="col-1 fw-bold">${phase}</div>
+                            <div class="col-2 text-end">${freqDisplay}</div>
+                            <div class="col pe-4">
+                                <div class="row text-info">
+                                    <div class="col text-end">${scaledAmplitudeA.toFixed(1)} V</div>
+                                    <div class="col-1 text-end">&ang;</div>
+                                    <div class="col text-end">${synth.phase_a + '°'}</div>
+                                </div>
+                                <div class="row text-warning">
+                                    <div class="col text-end">${scaledAmplitudeB.toFixed(2)} A</div>
+                                    <div class="col-1 text-end">&ang;</div>
+                                    <div class="col text-end">${synth.phase_b + '°'}</div>
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#synthAccordion">
+                        <div class="accordion-body bg-dark">
+                            <div class="mb-2 d-flex gap-2 justify-content-center">
+                                <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('voltage')}">Voltage</button>
+                                <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('current')}">Current</button>
+                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('phase')}">Phase</button>
+                                <button class="btn btn-sm btn-outline-primary" type="button">Harmonic</button>
+                                <button class="btn btn-sm btn-outline-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('frequency')}">Frequency</button>
+                            </div>
+                            <!-- Offcanvas for Voltage -->
+                            <div class="offcanvas offcanvas-start" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('voltage')}" aria-labelledby="${offcanvasId('voltage')}_label">
+                                <div class="offcanvas-header">
+                                    <h5 class="offcanvas-title" id="${offcanvasId('voltage')}_label">Set Voltage (L${idx + 1})</h5>
+                                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                                </div>
+                                <div class="offcanvas-body d-flex flex-column align-items-center">
+                                    <div class="input-group mb-3 w-75">
+                                        <button class="btn btn-outline-info" type="button" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, -1)">-</button>
+                                        <input type="text" class="form-control text-center" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" readonly>
+                                        <button class="btn btn-outline-info" type="button" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, 1)">+</button>
+                                    </div>
+                                    <div class="text-muted">(0 - 240 Vrms)</div>
+                                </div>
+                            </div>
+                            <!-- Offcanvas for Current -->
+                            <div class="offcanvas offcanvas-start" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('current')}" aria-labelledby="${offcanvasId('current')}_label">
+                                <div class="offcanvas-header">
+                                    <h5 class="offcanvas-title" id="${offcanvasId('current')}_label">Set Current (L${idx + 1})</h5>
+                                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                                </div>
+                                <div class="offcanvas-body d-flex flex-column align-items-center">
+                                    <div class="input-group mb-3 w-75">
+                                        <button class="btn btn-outline-warning" type="button" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, -1)">-</button>
+                                        <input type="text" class="form-control text-center" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" readonly>
+                                        <button class="btn btn-outline-warning" type="button" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, 1)">+</button>
+                                    </div>
+                                    <div class="text-muted">(0 - 10 Arms)</div>
+                                </div>
+                            </div>
+                            <!-- Offcanvas for Phase -->
+                            <div class="offcanvas offcanvas-start" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('phase')}" aria-labelledby="${offcanvasId('phase')}_label">
+                                <div class="offcanvas-header">
+                                    <h5 class="offcanvas-title" id="${offcanvasId('phase')}_label">Set Phase (L${idx + 1})</h5>
+                                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                                </div>
+                                <div class="offcanvas-body d-flex flex-column align-items-center">
+                                    <div class="input-group mb-3 w-75">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="window.incrementPhase && window.incrementPhase(${idx}, -1)">-</button>
+                                        <input type="text" class="form-control text-center" id="phase_input_${idx}" value="${synth.phase_a}" readonly>
+                                        <button class="btn btn-outline-secondary" type="button" onclick="window.incrementPhase && window.incrementPhase(${idx}, 1)">+</button>
+                                    </div>
+                                    <div class="text-muted">(0 - 360°)</div>
+                                </div>
+                            </div>
+                            <!-- Offcanvas for Frequency -->
+                            <div class="offcanvas offcanvas-start" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('frequency')}" aria-labelledby="${offcanvasId('frequency')}_label">
+                                <div class="offcanvas-header">
+                                    <h5 class="offcanvas-title" id="${offcanvasId('frequency')}_label">Set Frequency (L${idx + 1})</h5>
+                                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                                </div>
+                                <div class="offcanvas-body d-flex flex-column align-items-center">
+                                    <div class="input-group mb-3 w-75">
+                                        <button class="btn btn-outline-light" type="button" onclick="window.incrementFrequency && window.incrementFrequency(${idx}, -1)">-</button>
+                                        <input type="text" class="form-control text-center" id="frequency_input_${idx}" value="${synth.frequency_a}" readonly>
+                                        <button class="btn btn-outline-light" type="button" onclick="window.incrementFrequency && window.incrementFrequency(${idx}, 1)">+</button>
+                                    </div>
+                                    <div class="text-muted">(Hz)</div>
+                                </div>
+                            </div>
+                            <!-- Harmonic button is a placeholder for now -->
+                            <div class="row text-center mt-2">
+                                <div class="col-12">
+                                    <canvas id="${chartCanvasId}" width="220" height="80" style="display:block;margin:auto;"></canvas>
+                                </div>
+                                <div class="col-6 pe-1">
+                                    <div class="fw-semibold">Voltage</div>
+                                    <table class="table table-sm table-borderless text-muted">
+                                        <tbody>
+                                            ${renderHarmonics(synth.harmonics_a)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="col-6 ps-1">
+                                    <div class="fw-semibold">Current</div>
+                                    <table class="table table-sm table-borderless text-muted">
+                                        <tbody>
+                                            ${renderHarmonics(synth.harmonics_b)}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+// --- Offcanvas Increment/Decrement Handlers ---
+// These will be attached to window so they can be called from inline HTML
+window.incrementVoltage = async function(idx, delta) {
+    const synth = AppState.synthstate.synths[idx];
+    const VOLTAGE_RMS_MAX = 240;
+    let value = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX + delta;
+    value = Math.max(0, Math.min(VOLTAGE_RMS_MAX, value));
+    // Convert back to percent
+    const percent = (value / VOLTAGE_RMS_MAX) * 100;
+    await setSynthAmplitude(synth.id, 'a', percent);
+};
+window.incrementCurrent = async function(idx, delta) {
+    const synth = AppState.synthstate.synths[idx];
+    const CURRENT_RMS_MAX = 10;
+    let value = (synth.amplitude_b / 100) * CURRENT_RMS_MAX + delta * 0.1;
+    value = Math.max(0, Math.min(CURRENT_RMS_MAX, value));
+    const percent = (value / CURRENT_RMS_MAX) * 100;
+    await setSynthAmplitude(synth.id, 'b', percent);
+};
+window.incrementPhase = async function(idx, delta) {
+    const synth = AppState.synthstate.synths[idx];
+    let value = synth.phase_a + delta * 5;
+    value = ((value % 360) + 360) % 360;
+    await setSynthPhase(synth.id, 'a', value);
+};
+window.incrementFrequency = async function(idx, delta) {
+    const synth = AppState.synthstate.synths[idx];
+    let value = synth.frequency_a + delta * 1;
+    value = Math.max(0, value);
+    await setSynthFrequency(synth.id, 'a', value);
+};
+        }
+
+        function SynthCardsRow({ synths }) {
+            if (!synths || synths.length === 0) {
+                return `<div class="col"><div class="alert alert-info">No synths available.</div></div>`;
+            }
+            const phaseLabels = ['L1', 'L2', 'L3'];
+            // Wrap cards in a Bootstrap accordion
+            return `
+        <div class="accordion" id="synthAccordion">
+            ${synths.map((synth, idx) => SynthAccordionItem({ synth, idx, phaseLabel: phaseLabels[idx] })).join('')}
+        </div>
+    `;
+        }
+
+        function LoadingSpinner() {
+            return '<div class="col"><div class="alert alert-info">Waiting for data...</div></div>';
+        }
+
+
+        // --- Accordion & Offcanvas State Persistence ---
+        AppState.openAccordionId = null;
+        AppState.openOffcanvasId = null;
+
+        // Listen for accordion and offcanvas open/close events
+        function setupAccordionListeners() {
+            const accordion = document.getElementById('synthAccordion');
+            if (accordion) {
+                accordion.querySelectorAll('.accordion-collapse').forEach(collapse => {
+                    collapse.addEventListener('show.bs.collapse', function () {
+                        AppState.openAccordionId = this.id;
+                    });
+                    collapse.addEventListener('hide.bs.collapse', function () {
+                        if (AppState.openAccordionId === this.id) {
+                            AppState.openAccordionId = null;
+                        }
+                    });
+                });
+            }
+            // Offcanvas listeners
+            document.querySelectorAll('.offcanvas').forEach(offcanvas => {
+                offcanvas.addEventListener('show.bs.offcanvas', function () {
+                    AppState.openOffcanvasId = this.id;
+                });
+                offcanvas.addEventListener('hide.bs.offcanvas', function () {
+                    if (AppState.openOffcanvasId === this.id) {
+                        AppState.openOffcanvasId = null;
+                    }
+                });
+            });
+        }
+
+        // --- Render Logic ---
+        function render() {
+            // Synth cards
+            const cardsRow = document.getElementById('synth-cards-row');
+            if (cardsRow) {
+                if (AppState.synthstate && AppState.synthstate.synths) {
+                    cardsRow.innerHTML = SynthCardsRow({ synths: AppState.synthstate.synths });
+                    // After DOM update, render combined waveforms for each synth
+                    AppState.synthstate.synths.forEach((synth, idx) => {
+                        CombinedWaveformChart(synth, `waveform_combined_${idx}`);
+                    });
+                    // Restore open accordion if any, but only disable animation for this restoration
+                    if (AppState.openAccordionId) {
+                        const openElem = document.getElementById(AppState.openAccordionId);
+                        if (openElem && !openElem.classList.contains('show')) {
+                            // Temporarily disable transition for this element
+                            const prevTransition = openElem.style.transition;
+                            openElem.style.transition = 'none';
+                            openElem.classList.add('show');
+                            // Force reflow to apply the class immediately
+                            void openElem.offsetWidth;
+                            // Restore transition after a short delay
+                            setTimeout(() => {
+                                openElem.style.transition = prevTransition;
+                            }, 10);
+                        }
+                    }
+                    setupAccordionListeners();
+                    // Restore open offcanvas if any, but only disable animation for this restoration
+                    if (AppState.openOffcanvasId) {
+                        const offcanvasElem = document.getElementById(AppState.openOffcanvasId);
+                        if (offcanvasElem && !offcanvasElem.classList.contains('show')) {
+                            // Temporarily disable transition for this element
+                            const prevTransition = offcanvasElem.style.transition;
+                            offcanvasElem.style.transition = 'none';
+                            // Use Bootstrap's Offcanvas API to show
+                            const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasElem);
+                            bsOffcanvas.show();
+                            // Force reflow to apply the class immediately
+                            void offcanvasElem.offsetWidth;
+                            // Restore transition after a short delay
+                            setTimeout(() => {
+                                offcanvasElem.style.transition = prevTransition;
+                            }, 10);
+                        }
+                    }
+                } else {
+                    cardsRow.innerHTML = LoadingSpinner();
+                }
+            }
+        }
+
+        // --- Socket.IO and Event Logic ---
+
+        // Deep compare utility for synth state
+        function synthStateEquals(a, b) {
+            if (!a || !b) return false;
+            // Compare JSON stringified (fast, works for small state)
+            return JSON.stringify(a) === JSON.stringify(b);
+        }
+
+        const socket = io();
+        socket.on('synth_state', function (data) {
+            console.log('Received synth_state:', data);
+            if (!synthStateEquals(AppState.synthstate, data)) {
+                AppState.synthstate = data;
+                render();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function () {
+            render();
+            const fsBtn = document.getElementById('fullscreen-btn');
+            if (fsBtn) {
+                fsBtn.addEventListener('click', toggleFullscreen);
+            }
+            // Optionally update icon/text on fullscreen change
+            function updateFullscreenIcon() {
+                const icon = document.getElementById('fullscreen-icon');
+                if (!icon) return;
+                if (document.fullscreenElement) {
+                    icon.innerHTML = '&#x2715;'; // X for exit
+                } else {
+                    icon.innerHTML = '&#x26F6;'; // Diagonal arrow for enter
+                }
+            }
+            document.addEventListener('fullscreenchange', updateFullscreenIcon);
+            document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+            document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+            document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+        });
+
+        // --- Fullscreen Toggle Logic ---
+        function toggleFullscreen() {
+            const doc = window.document;
+            const docEl = doc.documentElement;
+            if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
+                if (docEl.requestFullscreen) {
+                    docEl.requestFullscreen();
+                } else if (docEl.mozRequestFullScreen) {
+                    docEl.mozRequestFullScreen();
+                } else if (docEl.webkitRequestFullscreen) {
+                    docEl.webkitRequestFullscreen();
+                } else if (docEl.msRequestFullscreen) {
+                    docEl.msRequestFullscreen();
+                }
+            } else {
+                if (doc.exitFullscreen) {
+                    doc.exitFullscreen();
+                } else if (doc.mozCancelFullScreen) {
+                    doc.mozCancelFullScreen();
+                } else if (doc.webkitExitFullscreen) {
+                    doc.webkitExitFullscreen();
+                } else if (doc.msExitFullscreen) {
+                    doc.msExitFullscreen();
+                }
+            }
+        }
+        </script>
+    <div class="d-flex justify-content-center align-items-center min-vh-100">
+        <div class="bg-secondary rounded shadow overflow-hidden" style="width:800px; height:480px;">
+            <div class="container">
+                <div class="row bg-dark mb-2 align-items-center" style="min-height:38px;">
+                    <div class="col text-end">
+                        <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()" title="Force Refresh">
+                            &#x21bb; Refresh
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
+                            <span id="fullscreen-icon">&#x26F6;</span> Fullscreen
+                        </button>
+                    </div>
+                </div>
+                <!-- Left panel: synth cards -->
+                <div class="row h-100">
+                    <div class="col-6 h-100 pe-1">
+
+                        <div class="row flex-nowrap overflow-auto h-100" id="synth-cards-row" style="min-height:340px;">
+                            <!-- Synth cards will be dynamically inserted here -->
+                        </div>
+                    </div>
+                    <!-- Right panel: blank for now -->
+                    <div class="col-6 h-100 ps-1">
+                        <div class="card rounded">
+                            <div class="card-header bg-dark text-light text-center py-2">
+                                <strong>Right Panel</strong>
+                            </div>
+                            <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                                <p class="text-muted">This panel is reserved for future content.</p>
+                            </div>
+                        </div>
+                        <!-- Placeholder for future content -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

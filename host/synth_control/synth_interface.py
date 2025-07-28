@@ -239,7 +239,7 @@ class SynthInterface:
             logger.error(f"Synth # {self.id} invalid harmonics response: {response}")
             return None
 
-    def add_harmonic(self, channel: str, order: int, percent: float, phase: float = 0) -> bool:
+    def set_harmonic(self, channel: str, order: int, amplitude: float, phase: float = 0) -> bool:
         """
         Add harmonic to a channel
         
@@ -255,14 +255,14 @@ class SynthInterface:
             raise ValueError("Channel must be 'a' or 'b'")
         if order < 3 or order % 2 == 0:
             raise ValueError("Harmonic order must be odd and >= 3")
-        if not (0 <= percent <= 100):
-            raise ValueError("Harmonic percent must be between 0 and 100")
+        if not (0 <= amplitude <= 100):
+            raise ValueError("Harmonic amplitude must be between 0 and 100")
         if not (-360 <= phase <= 360):
             raise ValueError("Harmonic phase must be between -360 and +360 degrees")
         if phase != 0:
-            return self.send_command(f"wh{channel.lower()}{order},{percent},{phase}")
+            return self.send_command(f"wh{channel.lower()}{order},{amplitude},{phase}")
         else:
-            return self.send_command(f"wh{channel.lower()}{order},{percent}")
+            return self.send_command(f"wh{channel.lower()}{order},{amplitude}")
             
     def clear_harmonics(self, channel: str) -> bool:
         """
