@@ -5,14 +5,23 @@
     <title>NHP Synth Home</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=800, height=480, initial-scale=1, maximum-scale=1, user-scalable=no">
-    <link rel="stylesheet" href="static/bootstrap.min.css">
-    <script src="static/socket.io.min.js"></script>
-    <script src="static/bootstrap.bundle.min.js"></script>
-    <script src="static/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="static/css/bootstrap.min.css">
+    <script src="static/js/socket.io.min.js"></script>
+    <script src="static/js/bootstrap.bundle.min.js"></script>
+    <script src="static/js/chart.umd.min.js"></script>
 </head>
 
 <body>
-    <script>
+    <script type="module">
+        import {
+            apiPost,
+            setSynthAmplitude,
+            setSynthFrequency,
+            setSynthPhase,
+            setSynthHarmonics,
+            sendSynthCommand,
+            synthStateEquals
+        } from './static/js/api.js';
 
         // --- Waveform Chart Component ---
         /**
@@ -123,72 +132,6 @@
                     }
                 }
             });
-        }
-        // --- API/Utility Functions ---
-        async function apiPost(endpoint, data) {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`POST ${endpoint} failed: ${response.status} ${errorText}`);
-            }
-            return await response.json();
-        }
-
-
-        // --- Synth Command Helper Functions ---
-        /**
-         * Set amplitude for a synth channel
-         * @param {number} synthId
-         * @param {string} channel - 'a' or 'b'
-         * @param {number} value
-         */
-        async function setSynthAmplitude(synthId, channel, value) {
-            return apiPost(`/api/synths/${synthId}/amplitude`, { channel, value });
-        }
-
-        /**
-         * Set frequency for a synth channel
-         * @param {number} synthId
-         * @param {string} channel - 'a' or 'b'
-         * @param {number} value
-         */
-        async function setSynthFrequency(synthId, channel, value) {
-            return apiPost(`/api/synths/${synthId}/frequency`, { channel, value });
-        }
-
-        /**
-         * Set phase for a synth channel
-         * @param {number} synthId
-         * @param {string} channel - 'a' or 'b'
-         * @param {number} value
-         */
-        async function setSynthPhase(synthId, channel, value) {
-            return apiPost(`/api/synths/${synthId}/phase`, { channel, value });
-        }
-
-        /**
-         * Set harmonics for a synth channel
-         * @param {number} synthId
-         * @param {string} channel - 'a' or 'b'
-         * @param {number[]|string} value - array of floats or comma-separated string
-         */
-        async function setSynthHarmonics(synthId, channel, value) {
-            return apiPost(`/api/synths/${synthId}/harmonics`, { channel, value });
-        }
-
-        /**
-         * Send a generic command to a synth (advanced)
-         * @param {number} synthId
-         * @param {string} command - e.g. 'set_phase', 'set_amplitude', etc.
-         * @param {string} channel
-         * @param {number|Array|String} value
-         */
-        async function sendSynthCommand(synthId, command, channel, value) {
-            return apiPost(`/api/synths/${synthId}/command`, { command, channel, value });
         }
 
         // --- State & Formatting ---
@@ -639,12 +582,6 @@
 
         // --- Socket.IO and Event Logic ---
 
-        // Deep compare utility for synth state
-        function synthStateEquals(a, b) {
-            if (!a || !b) return false;
-            // Compare JSON stringified (fast, works for small state)
-            return JSON.stringify(a) === JSON.stringify(b);
-        }
 
         const socket = io();
         socket.on('synth_state', function (data) {
