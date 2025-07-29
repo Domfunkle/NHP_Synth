@@ -68,8 +68,8 @@
     "amplitude_b": 50.0,
     "frequency_a": 50.0,
     "frequency_b": 50.0,
-    "phase_a": -120.0,
-    "phase_b": -120.0,
+    "phase_a": 240.0,
+    "phase_b": 240.0,
     "harmonics_a": [
       {
         "order": 3,
