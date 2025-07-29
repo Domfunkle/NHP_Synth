@@ -1,5 +1,8 @@
 // api.js - API and utility functions for NHP Synth Dashboard
 
+let socketInstance = null;
+export function setSocket(s) { socketInstance = s; }
+
 /**
  * GET from API endpoint
  * @param {string} endpoint
@@ -34,13 +37,36 @@ export async function apiPost(endpoint, data) {
 }
 
 /**
+ * Send a WebSocket command to a synth
+ * @param {WebSocket} socket - The WebSocket connection
+ * @param {number} synthId - The ID of the synth
+ * @param {string} command - The command to send (e.g. 'set_amplitude', 'set_frequency')
+ * @param {string} channel - The channel to target ('a' or 'b')
+ * @param {number|Array|String} value - The value to set (can be a number, array of floats, or comma-separated string)
+ * @param {function} [callback] - Optional callback function to handle the response
+ * @returns {void}
+ */
+export function sendSynthCommandWS(socket, synthId, command, channel, value, callback) {
+    const payload = {
+        synth_id: synthId,
+        command: command,
+        channel: channel,
+        value: value
+    };
+    socket.emit('command', payload, (response) => {
+        if (callback) callback(response);
+    });
+}
+
+/**
  * Set amplitude for a synth channel
  * @param {number} synthId
  * @param {string} channel - 'a' or 'b'
  * @param {number} value
  */
 export async function setSynthAmplitude(synthId, channel, value) {
-    return apiPost(`/api/synths/${synthId}/amplitude`, { channel, value });
+    return sendSynthCommandWS(socketInstance, synthId, 'set_amplitude', channel, value);
+    // return apiPost(`/api/synths/${synthId}/amplitude`, { channel, value });
 }
 
 /**
@@ -50,7 +76,8 @@ export async function setSynthAmplitude(synthId, channel, value) {
  * @param {number} value
  */
 export async function setSynthFrequency(synthId, channel, value) {
-    return apiPost(`/api/synths/${synthId}/frequency`, { channel, value });
+    return sendSynthCommandWS(socketInstance, synthId, 'set_frequency', channel, value);
+    // return apiPost(`/api/synths/${synthId}/frequency`, { channel, value });
 }
 
 /**
@@ -60,7 +87,8 @@ export async function setSynthFrequency(synthId, channel, value) {
  * @param {number} value
  */
 export async function setSynthPhase(synthId, channel, value) {
-    return apiPost(`/api/synths/${synthId}/phase`, { channel, value });
+    return sendSynthCommandWS(socketInstance, synthId, 'set_phase', channel, value);
+    // return apiPost(`/api/synths/${synthId}/phase`, { channel, value });
 }
 
 /**
@@ -70,7 +98,8 @@ export async function setSynthPhase(synthId, channel, value) {
  * @param {number[]|string} value - array of floats or comma-separated string
  */
 export async function setSynthHarmonics(synthId, channel, value) {
-    return apiPost(`/api/synths/${synthId}/harmonics`, { channel, value });
+    return sendSynthCommandWS(socketInstance, synthId, 'set_harmonics', channel, value);
+    // return apiPost(`/api/synths/${synthId}/harmonics`, { channel, value });
 }
 
 /**

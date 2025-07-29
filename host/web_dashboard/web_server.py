@@ -179,4 +179,26 @@ def create_app(command_queue, state_manager):
         except Exception:
             pass
 
+    # WebSocket listener for command messages
+    @socketio.on('command')
+    def handle_command_ws(data):
+        # Expecting data dict with keys: synth_id, command, channel, value
+        synth_id = data.get('synth_id')
+        command_name = data.get('command')
+        channel = data.get('channel')
+        value = data.get('value')
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            emit('command_response', {'error': 'Invalid value'})
+            return
+        command = {
+            'synth_id': synth_id,
+            'command': command_name,
+            'channel': channel,
+            'value': value
+        }
+        result = queue_command(command)
+        emit('command_response', result)
+
     return app, socketio

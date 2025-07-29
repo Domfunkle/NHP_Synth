@@ -21,7 +21,8 @@
             setSynthPhase,
             setSynthHarmonics,
             sendSynthCommand,
-            synthStateEquals
+            synthStateEquals,
+            setSocket
         } from './static/js/api.js';
 
         import {
@@ -156,6 +157,7 @@
 
         // --- Socket.IO and Event Logic ---
         const socket = io();
+        setSocket(socket);
         socket.on('synth_state', function (data) {
             if (!synthStateEquals(AppState.synthstate, data)) {
                 // Assign synthetic id if missing
