@@ -1,6 +1,6 @@
 // synthHandlers.js
 // All event handler functions for synth controls
-import { setSynthAmplitude, setSynthFrequency, setSynthPhase } from './api.js';
+import { setSynthAmplitude, setSynthFrequency, setSynthPhase, getDefaults } from './api.js';
 import { getSynthState } from './state.js';
 
 export async function incrementVoltage(idx, delta) {
@@ -40,6 +40,12 @@ export async function setVoltageDirect(idx, value) {
     await setSynthAmplitude(synth.id, 'a', percent);
 }
 
+export async function resetVoltage(idx) {
+    const { defaults } = await getDefaults();
+    const value = defaults[idx].amplitude_a;
+    await setSynthAmplitude(idx, 'a', value);
+}
+
 export async function incrementCurrent(idx, delta) {
     const synthState = getSynthState();
     if (!synthState || !synthState.synths || !synthState.synths[idx]) {
@@ -77,7 +83,13 @@ export async function setCurrentDirect(idx, value) {
     await setSynthAmplitude(synth.id, 'b', percent);
 }
 
-export async function incrementPhase(idx, delta) {
+export async function resetCurrent(idx) {
+    const { defaults } = await getDefaults();
+    const value = defaults[idx].amplitude_b;
+    await setSynthAmplitude(idx, 'b', value);
+}
+
+export async function incrementPhase(idx, channel, delta) {
     const synthState = getSynthState();
     if (!synthState || !synthState.synths || !synthState.synths[idx]) {
         console.error('incrementPhase: synth is undefined for idx', idx);
@@ -88,13 +100,17 @@ export async function incrementPhase(idx, delta) {
         console.error('incrementPhase: synth.id is undefined for idx', idx, synth);
         return;
     }
-    let value = synth.phase_a + delta;
+    if (typeof channel !== 'string' || !['a', 'b'].includes(channel)) {
+        console.error('incrementPhase: invalid channel', channel);
+        return;
+    }
+    let value = synth[`phase_${channel}`] + delta;
     value = ((value % 360) + 360) % 360;
     value = +value.toFixed(2);
-    await setSynthPhase(synth.id, 'a', value);
+    await setSynthPhase(synth.id, channel, value);
 }
 
-export async function setPhaseDirect(idx, value) {
+export async function setPhaseDirect(idx, channel, value) {
     const synthState = getSynthState();
     if (!synthState || !synthState.synths || !synthState.synths[idx]) {
         console.error('setPhaseDirect: synth is undefined for idx', idx);
@@ -105,11 +121,21 @@ export async function setPhaseDirect(idx, value) {
         console.error('setPhaseDirect: synth.id is undefined for idx', idx, synth);
         return;
     }
+    if (typeof channel !== 'string' || !['a', 'b'].includes(channel)) {
+        console.error('setPhaseDirect: invalid channel', channel);
+        return;
+    }
     let v = parseFloat(value);
     if (isNaN(v)) return;
     v = ((v % 360) + 360) % 360;
     v = +v.toFixed(2);
-    await setSynthPhase(synth.id, 'a', v);
+    await setSynthPhase(synth.id, channel, v);
+}
+
+export async function resetPhase(idx, channel) {
+    const { defaults } = await getDefaults();
+    const value = defaults[idx][`phase_${channel}`];
+    await setSynthPhase(idx, channel, value);
 }
 
 export async function incrementFrequency(idx, delta) {
@@ -145,4 +171,10 @@ export async function setFrequencyDirect(idx, value) {
     v = Math.max(0, v);
     v = +v.toFixed(2);
     await setSynthFrequency(synth.id, 'a', v);
+}
+
+export async function resetFrequency(idx) {
+    const { defaults } = await getDefaults();
+    const value = defaults[idx].frequency_a;
+    await setSynthFrequency(idx, 'a', value);
 }

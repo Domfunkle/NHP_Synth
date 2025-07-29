@@ -1,6 +1,20 @@
 // api.js - API and utility functions for NHP Synth Dashboard
 
 /**
+ * GET from API endpoint
+ * @param {string} endpoint
+ * @returns {Promise<object>}
+ */
+export async function apiGet(endpoint) {
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`GET ${endpoint} failed: ${response.status} ${errorText}`);
+    }
+    return await response.json();
+}
+
+/**
  * POST to API endpoint with JSON body
  * @param {string} endpoint
  * @param {object} data
@@ -79,4 +93,12 @@ export async function sendSynthCommand(synthId, command, channel, value) {
 export function synthStateEquals(a, b) {
     if (!a || !b) return false;
     return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * Get the defaults for the synth state
+ * @returns {object}
+ */
+export async function getDefaults() {
+    return apiGet('/api/defaults');
 }

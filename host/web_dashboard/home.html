@@ -6,6 +6,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=800, height=480, initial-scale=1, maximum-scale=1, user-scalable=no">
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="static/css/bootstrap-icons-1.11.0/bootstrap-icons.css">
     <script src="static/js/socket.io.min.js"></script>
     <script src="static/js/bootstrap.bundle.min.js"></script>
     <script src="static/js/chart.umd.min.js"></script>
@@ -31,8 +32,6 @@
             LoadingSpinner
         } from './static/js/components.js';
 
-
-        // --- State & Formatting ---
         import { 
             AppState,
             setSynthState,
@@ -43,28 +42,33 @@
             getOpenOffcanvasId
         } from './static/js/state.js';
 
-        // --- Offcanvas Increment/Decrement Handlers ---
-        // Import and attach event handlers to window for inline HTML usage
         import {
             incrementVoltage,
             setVoltageDirect,
+            resetVoltage,
             incrementCurrent,
             setCurrentDirect,
+            resetCurrent,
             incrementPhase,
             setPhaseDirect,
+            resetPhase,
             incrementFrequency,
-            setFrequencyDirect
+            setFrequencyDirect,
+            resetFrequency
         } from './static/js/synthHandlers.js';
 
         window.incrementVoltage = incrementVoltage;
         window.setVoltageDirect = setVoltageDirect;
+        window.resetVoltage = resetVoltage;
         window.incrementCurrent = incrementCurrent;
         window.setCurrentDirect = setCurrentDirect;
+        window.resetCurrent = resetCurrent;
         window.incrementPhase = incrementPhase;
         window.setPhaseDirect = setPhaseDirect;
+        window.resetPhase = resetPhase;
         window.incrementFrequency = incrementFrequency;
         window.setFrequencyDirect = setFrequencyDirect;
-
+        window.resetFrequency = resetFrequency;
 
         // --- Accordion & Offcanvas State Persistence ---
         setOpenAccordionId(null);
@@ -178,9 +182,9 @@
                 const icon = document.getElementById('fullscreen-icon');
                 if (!icon) return;
                 if (document.fullscreenElement) {
-                    icon.innerHTML = '&#x2715;'; // X for exit
+                    icon.innerHTML = '<span class="bi bi-fullscreen-exit"></span>'; // Exit fullscreen icon
                 } else {
-                    icon.innerHTML = '&#x26F6;'; // Diagonal arrow for enter
+                    icon.innerHTML = '<span class="bi bi-fullscreen"></span>'; // Fullscreen icon
                 }
             }
             document.addEventListener('fullscreenchange', updateFullscreenIcon);
@@ -221,10 +225,10 @@
             <div class="row bg-dark mb-2 align-items-center" style="min-height:38px;">
                 <div class="col text-end">
                     <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()" title="Force Refresh">
-                        &#x21bb; Refresh
+                    <span class="bi bi-arrow-clockwise"></span>
                     </button>
                     <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
-                        <span id="fullscreen-icon">&#x26F6;</span> Fullscreen
+                        <span id="fullscreen-icon"><span class="bi bi-fullscreen"></span></span>
                     </button>
                 </div>
             </div>
