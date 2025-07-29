@@ -138,43 +138,53 @@ export async function resetPhase(idx, channel) {
     await setSynthPhase(idx, channel, value);
 }
 
-export async function incrementFrequency(idx, delta) {
+export async function incrementFrequency(delta) {
     const synthState = getSynthState();
-    if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-        console.error('incrementFrequency: synth is undefined for idx', idx);
+    if (!synthState || !synthState.synths) {
+        console.error('incrementFrequency: synths are undefined');
         return;
     }
-    const synth = synthState.synths[idx];
-    if (typeof synth.id === 'undefined') {
-        console.error('incrementFrequency: synth.id is undefined for idx', idx, synth);
-        return;
+    const FREQ_MIN = 20;
+    const FREQ_MAX = 70;
+    for (const synth of synthState.synths) {
+        if (!synth || typeof synth.id === 'undefined') continue;
+        for (const channel of ['a', 'b']) {
+            let value = synth[`frequency_${channel}`] + delta * 1;
+            value = Math.max(FREQ_MIN, Math.min(FREQ_MAX, value));
+            value = +value.toFixed(2);
+            await setSynthFrequency(synth.id, channel, value);
+        }
     }
-    let value = synth.frequency_a + delta * 1;
-    value = Math.max(0, value);
-    value = +value.toFixed(2);
-    await setSynthFrequency(synth.id, 'a', value);
 }
 
-export async function setFrequencyDirect(idx, value) {
+export async function setFrequencyDirect(value) {
     const synthState = getSynthState();
-    if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-        console.error('setFrequencyDirect: synth is undefined for idx', idx);
+    if (!synthState || !synthState.synths) {
+        console.error('setFrequencyDirect: synths are undefined');
         return;
     }
-    const synth = synthState.synths[idx];
-    if (typeof synth.id === 'undefined') {
-        console.error('setFrequencyDirect: synth.id is undefined for idx', idx, synth);
-        return;
-    }
+    const FREQ_MIN = 20;
+    const FREQ_MAX = 70;
     let v = parseFloat(value);
     if (isNaN(v)) return;
-    v = Math.max(0, v);
+    v = Math.max(FREQ_MIN, Math.min(FREQ_MAX, v));
     v = +v.toFixed(2);
-    await setSynthFrequency(synth.id, 'a', v);
+    for (const synth of synthState.synths) {
+        if (!synth || typeof synth.id === 'undefined') continue;
+        for (const channel of ['a', 'b']) {
+            await setSynthFrequency(synth.id, channel, v);
+        }
+    }
 }
 
-export async function resetFrequency(idx) {
+export async function resetFrequency() {
     const { defaults } = await getDefaults();
-    const value = defaults[idx].frequency_a;
-    await setSynthFrequency(idx, 'a', value);
+    for (let idx = 0; idx < defaults.length; idx++) {
+        const synth = defaults[idx];
+        if (!synth) continue;
+        for (const channel of ['a', 'b']) {
+            const value = synth[`frequency_${channel}`];
+            await setSynthFrequency(idx, channel, value);
+        }
+    }
 }
