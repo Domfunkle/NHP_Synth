@@ -117,8 +117,8 @@ export function renderHarmonics(harmonics) {
 }
 
 export function getGlobalFrequencyHz(AppState) {
-    if (AppState.synthstate && Array.isArray(AppState.synthstate.synths) && AppState.synthstate.synths.length > 0) {
-        const freq = AppState.synthstate.synths[0].frequency_a;
+    if (AppState.synthState && Array.isArray(AppState.synthState.synths) && AppState.synthState.synths.length > 0) {
+        const freq = AppState.synthState.synths[0].frequency_a;
         return (freq !== undefined && freq !== null) ? freq : null;
     }
     return null;
@@ -189,7 +189,7 @@ window.resetSelected = function() {
 
 function harmonicOffCanvas(synth, idx, channel) {
     return `
-        <div class="offcanvas offcanvas-bottom" style="height:50vh" tabindex="-1" id="harmonics_${channel}_offcanvas_${idx}" aria-labelledby="harmonics_${channel}_offcanvas_${idx}_label">
+        <div class="offcanvas offcanvas-bottom" data-bs-backdrop="false" style="height:50vh" tabindex="-1" id="harmonics_${channel}_offcanvas_${idx}" aria-labelledby="harmonics_${channel}_offcanvas_${idx}_label">
             <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
                 <h5 class="offcanvas-title" id="harmonics_${channel}_offcanvas_${idx}_label">Harmonics (L${idx + 1} - ${channel === 'a' ? 'Voltage' : 'Current'})</h5>
                 <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -295,9 +295,12 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
     const collapseId = `collapseSynth${idx}`;
     const headingId = `headingSynth${idx}`;
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
-    let selectionMode = (synth.selection_mode) ? synth.selection_mode : {};
+
+    let selectionMode = (synth.selectionMode) ? synth.selectionMode : {};
+
     function highlightIfSelected(func, synthIdx, channel) {
         const mode = selectionMode[func];
+        console.log(`highlightIfSelected: func=${func}, synthIdx=${synthIdx}, channel=${channel}, mode=`, mode);
         if (!mode) return '';
         if (mode.synth === 'all') return '';
         if (mode.synth === synthIdx && (mode.ch === 'all' || mode.ch === channel)) return true;
@@ -447,7 +450,7 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
 }
 
 export function SynthCardsRow(AppState) {
-    const { synths } = AppState.synthstate
+    const { synths } = AppState.synthState
     if (!synths || synths.length === 0) {
         return `<div class="col"><div class="alert alert-info">No synths available.</div></div>`;
     }

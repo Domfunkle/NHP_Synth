@@ -131,10 +131,10 @@
             // Synth cards
             const cardsRow = document.getElementById('synth-cards-row');
             if (cardsRow) {
-                if (AppState.synthstate && AppState.synthstate.synths) {
+                if (AppState.synthState && AppState.synthState.synths) {
                     cardsRow.innerHTML = SynthCardsRow(AppState);
                     // After DOM update, render combined waveforms for each synth
-                    AppState.synthstate.synths.forEach((synth, idx) => {
+                    AppState.synthState.synths.forEach((synth, idx) => {
                         CombinedWaveformChart(synth, `waveform_combined_${idx}`);
                     });
                     console.log(AppState);
@@ -194,7 +194,7 @@
         const socket = io();
         setSocket(socket);
         socket.on('synth_state', function (data) {
-            if (!synthStateEquals(AppState.synthstate, data)) {
+            if (!synthStateEquals(AppState.synthState, data)) {
                 // Assign synthetic id if missing
                 if (data && Array.isArray(data.synths)) {
                     data.synths.forEach((synth, idx) => {
@@ -203,7 +203,7 @@
                         }
                     });
                 }
-                AppState.synthstate = data;
+                AppState.synthState = data;
                 render();
             }
         });
