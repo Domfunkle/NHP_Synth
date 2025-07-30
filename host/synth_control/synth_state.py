@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import copy
 logger = logging.getLogger("NHP_Synth")
 
 class SynthStateManager:
@@ -9,7 +10,7 @@ class SynthStateManager:
         self.defaults_file = defaults_file
         self.defaults = self.load_defaults()
         self.num_synths = 0
-        self.synths = []  # List of synth dicts, one per synth
+        self.synths = copy.deepcopy(self.defaults)  # List of synth dicts, one per synth
         self.selection_mode = None
 
     def get_defaults(self, idx, key):
@@ -61,7 +62,8 @@ class SynthStateManager:
             if not isinstance(data, dict) or "synths" not in data:
                 self.defaults = default_data["synths"]
                 return self._return_defaults()
-            return data["synths"]
+            self.defaults = copy.deepcopy(data["synths"])
+            return self.defaults
         except Exception as e:
             logger.warning(f"Could not load defaults: {e}")
             self.defaults = default_data["synths"]
