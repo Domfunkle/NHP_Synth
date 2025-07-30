@@ -165,14 +165,16 @@ class EncoderManager:
                         synth_harmonics[j]['amplitude'] = amp
                         synth_harmonics[j]['order'] = order
                         synth_harmonics[j]['phase'] = phase
-                        synth_interface[synth_id].set_harmonic(ch, order, amp, phase)
+                        value = {'order': order, 'amplitude': amp, 'phase': phase}
+                        synth_interface[synth_id].set_harmonics(ch, value)
                     # Set extra harmonics (not in defaults) to amplitude 0
                     extra_count = len(synth_harmonics) - len(default_harmonics)
                     for j in range(len(default_harmonics), len(synth_harmonics)):
                         synth_harmonics[j]['amplitude'] = 0
                         order = synth_harmonics[j]['order']
                         phase = synth_harmonics[j].get('phase', 0)
-                        synth_interface[synth_id].set_harmonic(ch, order, 0, phase)
+                        value = {'order': order, 'amplitude': 0, 'phase': phase}
+                        synth_interface[synth_id].set_harmonics(ch, value)
                     # Remove extra harmonics from state
                     if extra_count > 0:
                         del synth_harmonics[len(default_harmonics):]
@@ -327,14 +329,19 @@ class EncoderManager:
             for ch in channels:
                 harmonics_key = f'harmonics_{ch}'
                 for j in range(len(self.state.synths[i][harmonics_key])):
-                    old_amp = self.state.synths[i][harmonics_key][j]['amplitude']
+                    harmonic = self.state.synths[i][harmonics_key][j]
+                    old_amp = harmonic['amplitude']
                     new_amp = round(max(0, min(100, old_amp + delta)), 2)
-                    self.state.synths[i][harmonics_key][j]['amplitude'] = new_amp
-                    order = self.state.synths[i][harmonics_key][j]['order']
-                    phase = round(self.state.synths[i][harmonics_key][j].get('phase', 0), 2)
+                    harmonic['amplitude'] = new_amp
+                    value = {
+                        'id': harmonic.get('id'),
+                        'order': harmonic.get('order'),
+                        'amplitude': new_amp,
+                        'phase': round(harmonic.get('phase', 0), 2)
+                    }
                     if old_amp != new_amp:
-                        self.synth_interface[i].set_harmonic(ch, order, new_amp, phase)
-                        logger.info(f"Updated harmonics for synth {i}, channel {ch}, order {order} to amplitude {new_amp}")
+                        self.synth_interface[i].set_harmonics(ch, value)
+                        logger.info(f"Updated harmonics for synth {i}, channel {ch}, id {value['id']} order {value['order']} to amplitude {new_amp}")
         logger.info(f"Applied harmonics changes for {mode['synth']} on channel {mode['ch']}")
 
 
