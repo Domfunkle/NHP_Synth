@@ -188,7 +188,15 @@ def create_app(command_queue, state_manager):
         channel = data.get('channel')
         value = data.get('value')
         try:
-            value = float(value)
+            if isinstance(value, dict) and 'id' in value and 'order' in value and 'amplitude' in value:
+                value = {
+                    'id': int(value['id']),
+                    'order': int(value['order']),
+                    'amplitude': float(value['amplitude']),
+                    'phase': float(value.get('phase', 0))
+                }
+            else:
+                value = float(value)
         except (TypeError, ValueError):
             emit('command_response', {'error': 'Invalid value'})
             return

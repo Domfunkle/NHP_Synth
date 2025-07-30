@@ -14,7 +14,7 @@
 
 <body>
     <script type="module">
-        import { 
+        import {
             apiPost,
             setSynthAmplitude,
             setSynthFrequency,
@@ -33,16 +33,16 @@
             LoadingSpinner
         } from './static/js/components.js';
 
-        import { 
+        import {
             AppState,
             setSynthState,
             setOpenAccordionId,
             setOpenOffcanvasId,
-            setSelectedInputGroupId,
+            setSelectedId,
             getSynthState,
             getOpenAccordionId,
             getOpenOffcanvasId,
-            getSelectedInputGroupId
+            getSelectedId
         } from './static/js/state.js';
 
         import {
@@ -57,7 +57,8 @@
             resetPhase,
             incrementFrequency,
             setFrequencyDirect,
-            resetFrequency
+            resetFrequency,
+            incrementHarmonicOrder
         } from './static/js/synthHandlers.js';
 
         window.incrementVoltage = incrementVoltage;
@@ -72,11 +73,12 @@
         window.incrementFrequency = incrementFrequency;
         window.setFrequencyDirect = setFrequencyDirect;
         window.resetFrequency = resetFrequency;
+        window.incrementHarmonicOrder = incrementHarmonicOrder;
 
         // --- Accordion & Offcanvas State Persistence ---
         setOpenAccordionId(null);
         setOpenOffcanvasId(null);
-        setSelectedInputGroupId(null);
+        setSelectedId(null);
 
         // Listen for accordion and offcanvas open/close events
         function setupStateListeners() {
@@ -105,17 +107,17 @@
             });
 
             // Input group selection listeners
-            document.querySelectorAll('.input-group').forEach(group => {
-                group.addEventListener('click', function () {
-                    const currentId = getSelectedInputGroupId();
+            document.querySelectorAll('.selectable').forEach(element => {
+                element.addEventListener('click', function () {
+                    const currentId = getSelectedId();
                     if (currentId === this.id) {
-                        setSelectedInputGroupId(null); // Deselect if already selected
+                        setSelectedId(null); // Deselect if already selected
                     } else {
-                        setSelectedInputGroupId(this.id); // Select this group
+                        setSelectedId(this.id); // Select this group
                         // Deselect other groups
-                        document.querySelectorAll('.input-group').forEach(otherGroup => {
-                            if (otherGroup !== this) {
-                                otherGroup.classList.remove('selected');
+                        document.querySelectorAll('.selectable').forEach(otherSelectable => {
+                            if (otherSelectable !== this) {
+                                otherSelectable.classList.remove('selected');
                             }
                         });
                         this.classList.add('selected');
@@ -155,10 +157,10 @@
                     }
 
                     // Restore selected input group if any
-                    if (AppState.selectedInputGroupId) {
-                        const selectedGroup = document.getElementById(AppState.selectedInputGroupId);
-                        if (selectedGroup) {
-                            selectedGroup.classList.add('selected');
+                    if (AppState.selectedId) {
+                        const selectedId = document.getElementById(AppState.selectedId);
+                        if (selectedId) {
+                            selectedId.classList.add('selected');
                         }
                     }
 
@@ -254,13 +256,14 @@
                 }
             }
         }
-        </script>
+    </script>
     <div class="d-flex justify-content-center align-items-center min-vh-100">
         <div class="container-fluid bg-secondary rounded shadow overflow-hidden" style="width:800px; height:480px;">
             <div class="row bg-dark mb-2 align-items-center" style="min-height:38px;">
                 <div class="col text-end">
-                    <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()" title="Force Refresh">
-                    <span class="bi bi-arrow-clockwise"></span>
+                    <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()"
+                        title="Force Refresh">
+                        <span class="bi bi-arrow-clockwise"></span>
                     </button>
                     <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
                         <span id="fullscreen-icon"><span class="bi bi-fullscreen"></span></span>

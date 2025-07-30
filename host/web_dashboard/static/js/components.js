@@ -101,12 +101,12 @@ export function renderHarmonics(harmonics) {
             if (sorted[i]) {
                 cells.push(`<td class="text-start small py-0">H${sorted[i].order}</td><td class="text-end small py-0">${sorted[i].amplitude}%</td><td class="text-end small py-0">${sorted[i].phase}&deg;</td>`);
             } else {
-                cells.push('<td class="text-start small py-0">--</td><td class="text-end small py-0">--</td><td class="text-end small py-0">--</td>');
+                cells.push('<td class="text-start small py-0">&mdash;</td><td class="text-end small py-0">&mdash;</td><td class="text-end small py-0">&mdash;</td>');
             }
         }
     } else {
         for (let i = 0; i < 4; i++) {
-            cells.push('<td class="text-start small py-0">--</td><td class="text-end small py-0">--</td><td class="text-end small py-0">--</td>');
+            cells.push('<td class="text-start small py-0">&mdash;</td><td class="text-end small py-0">&mdash;</td><td class="text-end small py-0">&mdash;</td>');
         }
     }
     let rows = [];
@@ -124,46 +124,62 @@ export function getGlobalFrequencyHz(AppState) {
     return null;
 }
 
-window.selectedInputGroup = { idx: null, channel: null, type: null };
+window.selected = { idx: null, channel: null, type: null };
 
-window.setSelectedInputGroup = function(idx, channel, type) {
-    window.selectedInputGroup = { idx, channel, type };
-    document.querySelectorAll('.selectable-input-group').forEach(e => {
+window.setSelected = function(idx, channel, type) {
+    window.selected = { idx, channel, type };
+    document.querySelectorAll('.selectable').forEach(e => {
         e.classList.remove('selected');
     });
 
     const selId = type === 'voltage' ? `voltage_input_${idx}` :
                   type === 'current' ? `current_input_${idx}` :
                   type === 'phase' ? `phase_input_${idx}_${channel}` :
-                  type === 'frequency' ? `frequency_input_${idx}` : null;
+                  type === 'frequency' ? `frequency_input_${idx}` :
+                  (type.startsWith('harmonic_order_')) ? `harmonic_${channel}_order_${type.split('_')[2]}_${idx}` :
+                  (type.startsWith('harmonic_amp_')) ? `harmonic_${channel}_amp_${type.split('_')[2]}_${idx}` :
+                  (type.startsWith('harmonic_phase_')) ? `harmonic_${channel}_phase_${type.split('_')[2]}_${idx}` : null;
 
-    if (selId) {
-        const group = document.getElementById(selId)?.closest('.selectable-input-group');
-        if (group) {
-            group.classList.add('selected');
-        }
+    if (!selId) return;
+
+    const group = document.getElementById(selId)?.closest('.selectable');
+    if (group) {
+        group.classList.add('selected');
     }
+
     document.getElementById(`increment_buttons_${idx}`).innerHTML = renderIncrementButtons();
 };
 
-window.clearSelectedInputGroup = function() {
-    window.selectedInputGroup = { idx: null, channel: null, type: null };
-    document.querySelectorAll('.selectable-input-group').forEach(e => {
+window.clearSelected = function() {
+    window.selected = { idx: null, channel: null, type: null };
+    document.querySelectorAll('.selectable').forEach(e => {
         e.classList.remove('selected');
     });
 };
 
-window.incrementSelectedInputGroup = function(delta) {
-    const { idx, channel, type } = window.selectedInputGroup;
+window.incrementSelected = function(delta) {
+    const { idx, channel, type } = window.selected;
     if (idx === null || !type) return;
     if (type === 'voltage' && window.incrementVoltage) window.incrementVoltage(idx, delta);
     if (type === 'current' && window.incrementCurrent) window.incrementCurrent(idx, delta);
     if (type === 'phase' && window.incrementPhase) window.incrementPhase(idx, channel, delta);
     if (type === 'frequency' && window.incrementFrequency) window.incrementFrequency(delta);
+    if (type.startsWith('harmonic_order_') && window.incrementHarmonicOrder) {
+        const harmonicId = +type.split('_')[2];
+        window.incrementHarmonicOrder(idx, channel, harmonicId, delta);
+    }
+    if (type.startsWith('harmonic_amp_') && window.incrementHarmonicAmplitude) {
+        const harmonicId = type.split('_')[2];
+        window.incrementHarmonicAmplitude(idx, channel, harmonicId, delta);
+    }
+    if (type.startsWith('harmonic_phase_') && window.incrementHarmonicPhase) {
+        const harmonicId = type.split('_')[2];
+        window.incrementHarmonicPhase(idx, channel, harmonicId, delta);
+    }
 };
 
-window.resetSelectedInputGroup = function() {
-    const { idx, channel, type } = window.selectedInputGroup;
+window.resetSelected = function() {
+    const { idx, channel, type } = window.selected;
     if (idx === null || !type) return;
     if (type === 'voltage' && window.resetVoltage) window.resetVoltage(idx);
     if (type === 'current' && window.resetCurrent) window.resetCurrent(idx);
@@ -171,10 +187,51 @@ window.resetSelectedInputGroup = function() {
     if (type === 'frequency' && window.resetFrequency) window.resetFrequency();
 };
 
+function harmonicOffCanvas(synth, idx, channel) {
+    return `
+        <div class="offcanvas offcanvas-bottom" style="height:50vh" tabindex="-1" id="harmonics_${channel}_offcanvas_${idx}" aria-labelledby="harmonics_${channel}_offcanvas_${idx}_label">
+            <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
+                <h5 class="offcanvas-title" id="harmonics_${channel}_offcanvas_${idx}_label">Harmonics (L${idx + 1} - ${channel === 'a' ? 'Voltage' : 'Current'})</h5>
+                <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body p-2" style="overflow-y:hidden;overflow-x:hidden;">
+                <div class="row justify-content-center px-2">
+                    <div class="col-auto">
+                        <table class="table table-sm table-bordered mb-2 text-center" style="min-width:320px">
+                            <thead>
+                                <tr>
+                                    <th>Order</th>
+                                    <th>%</th>
+                                    <th>&Phi;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${[0,1,2,3].map(i => {
+                                    const h = channel === 'a' ? synth.harmonics_a?.[i] : synth.harmonics_b?.[i];
+                                    const cellStyle = 'style="width:80px;min-width:80px;max-width:80px;"';
+                                    return `<tr>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_order_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_order_${i}')">${h?.order ?? '&mdash;'}</td>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_amp_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_amp_${i}')">${h?.amplitude ?? '&mdash;'}</td>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_phase_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_phase_${i}')">${h?.phase ?? '&mdash;'}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col" id="increment_buttons_harmonics_${channel}_${idx}">
+                        ${renderIncrementButtons()}
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+}
+
 function renderIncrementButtons() {
     // Store current adjustment index in window
     if (window.incrementAdjustmentIndex === undefined) window.incrementAdjustmentIndex = 0;
-    const multiplier = (window.selectedInputGroup.type === 'current') ? 0.1 : 1;
+    const multiplier = (window.selected.type === 'current') ? 0.1 :
+                        (window.selected.type?.startsWith('harmonic_order_')) ? 20 : 1;
 
     function round(val) {return +val.toFixed(3);}
 
@@ -192,7 +249,7 @@ function renderIncrementButtons() {
         window.incrementAdjustmentIndex = (window.incrementAdjustmentIndex + 1) % adjustmentLevels.length;
         // Re-render buttons if needed
         document.querySelectorAll('[id^="increment_buttons_"]').forEach(e => {
-            if (typeof window.selectedInputGroup.idx === 'number') {
+            if (typeof window.selected.idx === 'number') {
                 e.innerHTML = renderIncrementButtons();
             }
         });
@@ -201,11 +258,11 @@ function renderIncrementButtons() {
     return `
         <div class="d-flex flex-column gap-2">
             <button class="btn btn-outline-info p-2 btn-lg" type="button"
-                onclick="window.incrementSelectedInputGroup(${round(adjustment.value)})">
+                onclick="window.incrementSelected(${round(adjustment.value)})">
                 <span class="bi bi-arrow-up"></span>
             </button>
             <button class="btn btn-outline-info p-2 btn-lg" type="button"
-                onclick="window.incrementSelectedInputGroup(${round(-adjustment.value)})">
+                onclick="window.incrementSelected(${round(-adjustment.value)})">
                 <span class="bi bi-arrow-down"></span>
             </button>
             <div class="d-flex flex-row gap-2">
@@ -214,7 +271,7 @@ function renderIncrementButtons() {
                     <i class="bi bi-plus-slash-minus"></i> ${adjustment.value}
                 </button>
                 <button class="btn btn-outline-danger p-2 w-50" type="button"
-                    onclick="window.resetSelectedInputGroup()">
+                    onclick="window.resetSelected()">
                     <span class="bi bi-arrow-clockwise"></span>
                 </button>
             </div>
@@ -224,7 +281,7 @@ function renderIncrementButtons() {
 
 // listener for offcanvas close events
 document.addEventListener('hidden.bs.offcanvas', function(event) {
-    window.clearSelectedInputGroup();
+    window.clearSelected();
 });
 
 export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
@@ -330,14 +387,14 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                                 <div class="col-auto">
                                     <div class="row">
                                         <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="voltage_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'voltage')">
+                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="voltage_group_${idx}" onclick="window.setSelected && window.setSelected(${idx}, 'a', 'voltage')">
                                                 <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">V</div>
                                                 <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)}">
                                                 <div class="input-group-text text-muted" style="min-width:120px">0 - 240 V<sub>rms</sub></div>
                                             </div>
                                         </div>
                                         <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="current_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'b', 'current')">
+                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="current_group_${idx}" onclick="window.setSelected && window.setSelected(${idx}, 'b', 'current')">
                                                 <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">I</div>
                                                 <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)}">
                                                 <div class="input-group-text text-muted" style="min-width:120px">0 - 10 A<sub>rms</sub></div>
@@ -346,14 +403,14 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                                     </div>
                                     <div class="row">
                                         <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="phase_a_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'phase')">
+                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="phase_a_group_${idx}" onclick="window.setSelected && window.setSelected(${idx}, 'a', 'phase')">
                                                 <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
                                                 <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)}">
                                                 <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
                                             </div>
                                         </div>
                                         <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="phase_b_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'b', 'phase')">
+                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="phase_b_group_${idx}" onclick="window.setSelected && window.setSelected(${idx}, 'b', 'phase')">
                                                 <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
                                                 <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)}">
                                                 <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
@@ -362,7 +419,7 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                                     </div>
                                     <div class="row justify-content-center">
                                         <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="frequency_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'frequency')">
+                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="frequency_group_${idx}" onclick="window.setSelected && window.setSelected(${idx}, 'a', 'frequency')">
                                                 <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">f</div>
                                                 <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)}">
                                                 <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
@@ -381,55 +438,8 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                         </div>
                     </div>
                     <!-- Offcanvas for Harmonics -->
-                    <div class="offcanvas offcanvas-bottom" style="height:50vh" tabindex="-1" id="harmonics_a_offcanvas_${idx}" aria-labelledby="harmonics_a_offcanvas_${idx}_label">
-                        <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
-                            <h5 class="offcanvas-title" id="harmonics_a_offcanvas_${idx}_label">Harmonics (L${idx + 1} - Voltage)</h5>
-                            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-                        </div>
-                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden;">
-                            <div class="mb-2 text-center">
-                                ${[0,1,2,3].map(i => {
-                                    const h = synth.harmonics_a?.[i];
-                                    return `
-                                    <div class="input-group mb-2 justify-content-center">
-                                        <span class="input-group-text" style="min-width:68px">Order</span>
-                                        <input type="number" class="form-control text-center" min="3" step="2" max="99" style="width:70px" value="${h?.order ?? ''}" id="harmonics_a_order_${idx}_${i}" oninput="window.validateHarmonicOrder && window.validateHarmonicOrder(${idx}, 'a', ${i}, this.value)">
-                                        <span class="input-group-text" style="min-width:68px">%</span>
-                                        <input type="number" class="form-control text-center" min="0" max="100" style="width:70px" value="${h?.amplitude ?? ''}" id="harmonics_a_amp_${idx}_${i}" oninput="window.validateHarmonicAmplitude && window.validateHarmonicAmplitude(${idx}, 'a', ${i}, this.value)">
-                                        <span class="input-group-text" style="min-width:68px">&Phi;</span>
-                                        <input type="number" class="form-control text-center" min="0" max="360" style="width:70px" value="${h?.phase ?? ''}" id="harmonics_a_phase_${idx}_${i}" oninput="window.validateHarmonicPhase && window.validateHarmonicPhase(${idx}, 'a', ${i}, this.value)">
-                                        <button class="btn btn-outline-danger" type="button" onclick="window.removeHarmonic && window.removeHarmonic(${idx}, 'a', ${i})"><span class="bi bi-x"></span></button>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                            <div class="text-muted small">Order must be odd, ≥3, and unique. %: 0-100, Phase: 0-360°</div>
-                         </div>
-                    </div>
-                    <!-- Offcanvas for Harmonics B -->
-                    <div class="offcanvas offcanvas-bottom" style="height:50vh" tabindex="-1" id="harmonics_b_offcanvas_${idx}" aria-labelledby="harmonics_b_offcanvas_${idx}_label">
-                        <div class="offcanvas-header">
-                            <h5 class="offcanvas-title" id="harmonics_b_offcanvas_${idx}_label">Harmonics (L${idx + 1} - Current)</h5>
-                            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-                        </div>
-                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden;">
-                            <div class="mb-2 text-center">
-                                ${[0,1,2,3].map(i => {
-                                    const h = synth.harmonics_b?.[i];
-                                    return `
-                                    <div class="input-group mb-2 justify-content-center">
-                                        <span class="input-group-text" style="min-width:68px">Order</span>
-                                        <input type="number" class="form-control text-center" min="3" step="2" max="99" style="width:70px" value="${h?.order ?? ''}" id="harmonics_b_order_${idx}_${i}" oninput="window.validateHarmonicOrder && window.validateHarmonicOrder(${idx}, 'b', ${i}, this.value)">
-                                        <span class="input-group-text" style="min-width:68px">%</span>
-                                        <input type="number" class="form-control text-center" min="0" max="100" style="width:70px" value="${h?.amplitude ?? ''}" id="harmonics_b_amp_${idx}_${i}" oninput="window.validateHarmonicAmplitude && window.validateHarmonicAmplitude(${idx}, 'b', ${i}, this.value)">
-                                        <span class="input-group-text" style="min-width:68px">&Phi;</span>
-                                        <input type="number" class="form-control text-center" min="0" max="360" style="width:70px" value="${h?.phase ?? ''}" id="harmonics_b_phase_${idx}_${i}" oninput="window.validateHarmonicPhase && window.validateHarmonicPhase(${idx}, 'b', ${i}, this.value)">
-                                        <button class="btn btn-outline-danger" type="button" onclick="window.removeHarmonic && window.removeHarmonic(${idx}, 'b', ${i})"><span class="bi bi-x"></span></button>
-                                    </div>`;
-                                }).join('')}
-                            </div>
-                            <div class="text-muted small">Order must be odd, ≥3, and unique. %: 0-100, Phase: 0-360°</div>
-                        </div>
-                    </div>
+                    ${harmonicOffCanvas(synth, idx, 'a')}
+                    ${harmonicOffCanvas(synth, idx, 'b')}
                 </div>
             </div>
         </div>

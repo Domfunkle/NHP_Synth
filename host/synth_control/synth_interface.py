@@ -239,31 +239,34 @@ class SynthInterface:
             logger.error(f"Synth # {self.id} invalid harmonics response: {response}")
             return None
 
-    def set_harmonic(self, channel: str, order: int, amplitude: float, phase: float = 0) -> bool:
+    def set_harmonics(self, channel: str, harmonic: dict) -> bool:
         """
         Add harmonic to a channel
         
         Args:
             channel: 'a' or 'b'
-            order: Harmonic order (odd numbers >= 3)
-            percent: Harmonic amplitude 0-100%
-            phase: Harmonic phase in degrees (default: 0, allowed: -360 to +360)
+            harmonic: dict with keys 'order', 'amplitude', 'phase'
         Returns:
             True if command sent successfully
         """
         if channel.lower() not in ['a', 'b']:
             raise ValueError("Channel must be 'a' or 'b'")
+        
+        order = harmonic.get('order')
+        amplitude = harmonic.get('amplitude')
+        phase = harmonic.get('phase', 0)
+
+        if order is None or amplitude is None:
+            raise ValueError("Harmonic dict must contain 'order' and 'amplitude'")
         if order < 3 or order % 2 == 0:
             raise ValueError("Harmonic order must be odd and >= 3")
         if not (0 <= amplitude <= 100):
             raise ValueError("Harmonic amplitude must be between 0 and 100")
         if not (-360 <= phase <= 360):
             raise ValueError("Harmonic phase must be between -360 and +360 degrees")
-        if phase != 0:
-            return self.send_command(f"wh{channel.lower()}{order},{amplitude},{phase}")
-        else:
-            return self.send_command(f"wh{channel.lower()}{order},{amplitude}")
-            
+        
+        return self.send_command(f"wh{channel.lower()}{order},{amplitude},{phase}")
+
     def clear_harmonics(self, channel: str) -> bool:
         """
         Clear all harmonics for a channel

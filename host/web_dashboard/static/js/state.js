@@ -3,7 +3,7 @@ export const AppState = {
     synthstate: null,
     openAccordionId: null,
     openOffcanvasId: null,
-    selectedInputGroupId: null,
+    selectedId: null,
 };
 
 // Optional mutators for clarity and future extensibility
@@ -16,8 +16,8 @@ export function setOpenAccordionId(id) {
 export function setOpenOffcanvasId(id) {
     AppState.openOffcanvasId = id;
 }
-export function setSelectedInputGroupId(id) {
-    AppState.selectedInputGroupId = id;
+export function setSelectedId(id) {
+    AppState.selectedId = id;
 }
 
 // Optional getters
@@ -30,6 +30,6 @@ export function getOpenAccordionId() {
 export function getOpenOffcanvasId() {
     return AppState.openOffcanvasId;
 }
-export function getSelectedInputGroupId() {
-    return AppState.selectedInputGroupId;
+export function getSelectedId() {
+    return AppState.selectedId;
 }

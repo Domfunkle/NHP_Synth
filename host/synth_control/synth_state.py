@@ -42,12 +42,12 @@ class SynthStateManager:
                 "phase_a": 0.0 if i == 0 else (120.0 if i == 1 else 240.0),
                 "phase_b": 0.0 if i == 0 else (120.0 if i == 1 else 240.0),
                 "harmonics_a": [
-                    {"order": 3, "amplitude": 0, "phase": 0},
-                    {"order": 5, "amplitude": 0, "phase": 0}
+                    {"id": 0, "order": 3, "amplitude": 0, "phase": 0},
+                    {"id": 1, "order": 5, "amplitude": 0, "phase": 0}
                 ],
                 "harmonics_b": [
-                    {"order": 3, "amplitude": 0, "phase": 180},
-                    {"order": 5, "amplitude": 0, "phase": 180}
+                    {"id": 0, "order": 3, "amplitude": 0, "phase": 180},
+                    {"id": 1, "order": 5, "amplitude": 0, "phase": 180}
                 ]
             })
 

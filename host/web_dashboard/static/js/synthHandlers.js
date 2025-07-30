@@ -1,6 +1,6 @@
 // synthHandlers.js
 // All event handler functions for synth controls
-import { setSynthAmplitude, setSynthFrequency, setSynthPhase, getDefaults } from './api.js';
+import { setSynthAmplitude, setSynthFrequency, setSynthPhase, getDefaults, setSynthHarmonics } from './api.js';
 import { getSynthState } from './state.js';
 
 export async function incrementVoltage(idx, delta) {
@@ -187,4 +187,33 @@ export async function resetFrequency() {
             await setSynthFrequency(idx, channel, value);
         }
     }
+}
+
+export async function incrementHarmonicOrder(idx, channel, id, delta) {
+    const synthState = getSynthState();
+    if (!synthState || !synthState.synths || !synthState.synths[idx]) {
+        console.error('incrementHarmonicOrder: synth is undefined for idx', idx);
+        return;
+    }
+    const synth = synthState.synths[idx];
+    if (typeof synth.id === 'undefined') {
+        console.error('incrementHarmonicOrder: synth.id is undefined for idx', idx, synth);
+        return;
+    }
+    if (typeof channel !== 'string' || !['a', 'b'].includes(channel)) {
+        console.error('incrementHarmonicOrder: invalid channel', channel);
+        return;
+    }
+    const maxOrder = 127; // Assuming max order is 127
+    // find the index of the harmonic by id
+    const index = synth[`harmonics_${channel}`]?.findIndex(h => h.id === id);
+
+    let order = synth[`harmonics_${channel}`]?.[index]?.order ?? 1;
+    let amplitude = synth[`harmonics_${channel}`]?.[index]?.amplitude ?? 0;
+    let phase = synth[`harmonics_${channel}`]?.[index]?.phase ?? 0;
+
+    order += delta;
+    order = Math.max(1, Math.min(maxOrder, order));
+    const value = { id, order, amplitude, phase };
+    await setSynthHarmonics(synth.id, channel, value);
 }

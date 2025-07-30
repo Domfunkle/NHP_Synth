@@ -31,10 +31,38 @@ def process_command_queue(command_queue, synths, state_manager):
                     elif channel == 'b':
                         synth_state['phase_b'] = value
                 elif command == 'set_harmonics':
-                    synth.set_harmonics(channel, value)
-                    if channel == 'a':
-                        synth_state['harmonics_a'] = value
-                    elif channel == 'b':
-                        synth_state['harmonics_b'] = value
+                    deleteHarmonic = False
+                    # setting the amplitude to 0 deletes the harmonic
+                    if value.get("order") < 3:
+                        value['amplitude'] = 0
+                        value['order'] = 3
+                        deleteHarmonic = True
+
+                    synth.set_harmonics(channel, value)   
+
+                    id = value.get('id')
+                    order = value.get('order')
+                    amplitude = value.get('amplitude')
+                    phase = value.get('phase', 0)
+                    channelStr = 'harmonics_' + channel
+
+                    # find the element in the harmonics list with the matching order, update it or create a new one
+                    for harmonic in synth_state[channelStr]:
+                        if harmonic['id'] == id:
+                            if deleteHarmonic:
+                                synth_state[channelStr].remove(harmonic)
+                            else:
+                                harmonic['order'] = order
+                                harmonic['amplitude'] = amplitude
+                                harmonic['phase'] = phase
+                            break
+                    else:
+                        synth_state[channelStr].append({
+                            'id': id,
+                            'order': order,
+                            'amplitude': amplitude,
+                            'phase': phase
+                        })
+
         except Exception as e:
             logger.error(f"Failed to process command from queue: {e}")
