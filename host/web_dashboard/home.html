@@ -38,9 +38,11 @@
             setSynthState,
             setOpenAccordionId,
             setOpenOffcanvasId,
+            setSelectedInputGroupId,
             getSynthState,
             getOpenAccordionId,
-            getOpenOffcanvasId
+            getOpenOffcanvasId,
+            getSelectedInputGroupId
         } from './static/js/state.js';
 
         import {
@@ -74,22 +76,22 @@
         // --- Accordion & Offcanvas State Persistence ---
         setOpenAccordionId(null);
         setOpenOffcanvasId(null);
+        setSelectedInputGroupId(null);
 
         // Listen for accordion and offcanvas open/close events
-        function setupAccordionListeners() {
+        function setupStateListeners() {
             const accordion = document.getElementById('synthAccordion');
-            if (accordion) {
-                accordion.querySelectorAll('.accordion-collapse').forEach(collapse => {
-                    collapse.addEventListener('show.bs.collapse', function () {
-                        setOpenAccordionId(this.id);
-                    });
-                    collapse.addEventListener('hide.bs.collapse', function () {
-                        if (getOpenAccordionId() === this.id) {
-                            setOpenAccordionId(null);
-                        }
-                    });
+            accordion.querySelectorAll('.accordion-collapse').forEach(collapse => {
+                collapse.addEventListener('show.bs.collapse', function () {
+                    setOpenAccordionId(this.id);
                 });
-            }
+                collapse.addEventListener('hide.bs.collapse', function () {
+                    if (getOpenAccordionId() === this.id) {
+                        setOpenAccordionId(null);
+                    }
+                });
+            });
+
             // Offcanvas listeners
             document.querySelectorAll('.offcanvas').forEach(offcanvas => {
                 offcanvas.addEventListener('show.bs.offcanvas', function () {
@@ -98,6 +100,25 @@
                 offcanvas.addEventListener('hide.bs.offcanvas', function () {
                     if (getOpenOffcanvasId() === this.id) {
                         setOpenOffcanvasId(null);
+                    }
+                });
+            });
+
+            // Input group selection listeners
+            document.querySelectorAll('.input-group').forEach(group => {
+                group.addEventListener('click', function () {
+                    const currentId = getSelectedInputGroupId();
+                    if (currentId === this.id) {
+                        setSelectedInputGroupId(null); // Deselect if already selected
+                    } else {
+                        setSelectedInputGroupId(this.id); // Select this group
+                        // Deselect other groups
+                        document.querySelectorAll('.input-group').forEach(otherGroup => {
+                            if (otherGroup !== this) {
+                                otherGroup.classList.remove('selected');
+                            }
+                        });
+                        this.classList.add('selected');
                     }
                 });
             });
@@ -114,6 +135,8 @@
                     AppState.synthstate.synths.forEach((synth, idx) => {
                         CombinedWaveformChart(synth, `waveform_combined_${idx}`);
                     });
+                    console.log(AppState);
+
                     // Restore open accordion if any, but only disable animation for this restoration
                     if (AppState.openAccordionId) {
                         const openElem = document.getElementById(AppState.openAccordionId);
@@ -130,7 +153,15 @@
                             }, 10);
                         }
                     }
-                    setupAccordionListeners();
+
+                    // Restore selected input group if any
+                    if (AppState.selectedInputGroupId) {
+                        const selectedGroup = document.getElementById(AppState.selectedInputGroupId);
+                        if (selectedGroup) {
+                            selectedGroup.classList.add('selected');
+                        }
+                    }
+
                     // Restore open offcanvas if any, but only disable animation for this restoration
                     if (AppState.openOffcanvasId) {
                         const offcanvasElem = document.getElementById(AppState.openOffcanvasId);
@@ -149,6 +180,8 @@
                             }, 10);
                         }
                     }
+
+                    setupStateListeners();
                 } else {
                     cardsRow.innerHTML = LoadingSpinner();
                 }

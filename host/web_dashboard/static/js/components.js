@@ -2,7 +2,6 @@
 // Exported as ES module
 
 export function CombinedWaveformChart(synth, canvasId) {
-    // ...existing code...
     const amplitudeA = synth.amplitude_a, frequencyA = synth.frequency_a, phaseA = synth.phase_a;
     const amplitudeB = synth.amplitude_b, frequencyB = synth.frequency_b, phaseB = synth.phase_b;
     if ([amplitudeA, frequencyA, phaseA, amplitudeB, frequencyB, phaseB].some(v => v === undefined)) return;
@@ -67,7 +66,10 @@ export function CombinedWaveformChart(synth, canvasId) {
         options: {
             responsive: false,
             animation: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: false }
+            },
             scales: {
                 x: { display: false },
                 yV: {
@@ -122,6 +124,58 @@ export function getGlobalFrequencyHz(AppState) {
     return null;
 }
 
+window.selectedInputGroup = { idx: null, channel: null, type: null };
+
+window.setSelectedInputGroup = function(idx, channel, type) {
+    console.log(`Setting selected input group: idx=${idx}, channel=${channel}, type=${type}`);
+    window.selectedInputGroup = { idx, channel, type };
+    document.querySelectorAll('.selectable-input-group').forEach(e => {
+        e.classList.remove('selected');
+    });
+
+    const selId = type === 'voltage' ? `voltage_input_${idx}` :
+                  type === 'current' ? `current_input_${idx}` :
+                  type === 'phase' ? `phase_input_${idx}_${channel}` :
+                  type === 'frequency' ? `frequency_input_${idx}` : null;
+
+    if (selId) {
+        const group = document.getElementById(selId)?.closest('.selectable-input-group');
+        if (group) {
+            group.classList.add('selected');
+        }
+    }
+};
+
+window.clearSelectedInputGroup = function() {
+    window.selectedInputGroup = { idx: null, channel: null, type: null };
+    document.querySelectorAll('.selectable-input-group').forEach(e => {
+        e.classList.remove('selected');
+    });
+};
+
+window.incrementSelectedInputGroup = function(delta) {
+    const { idx, channel, type } = window.selectedInputGroup;
+    if (idx === null || !type) return;
+    if (type === 'voltage' && window.incrementVoltage) window.incrementVoltage(idx, delta);
+    if (type === 'current' && window.incrementCurrent) window.incrementCurrent(idx, delta);
+    if (type === 'phase' && window.incrementPhase) window.incrementPhase(idx, channel, delta);
+    if (type === 'frequency' && window.incrementFrequency) window.incrementFrequency(delta);
+};
+
+window.resetSelectedInputGroup = function() {
+    const { idx, channel, type } = window.selectedInputGroup;
+    if (idx === null || !type) return;
+    if (type === 'voltage' && window.resetVoltage) window.resetVoltage(idx);
+    if (type === 'current' && window.resetCurrent) window.resetCurrent(idx);
+    if (type === 'phase' && window.resetPhase) window.resetPhase(idx, channel);
+    if (type === 'frequency' && window.resetFrequency) window.resetFrequency();
+};
+
+// listener for offcanvas close events
+document.addEventListener('hidden.bs.offcanvas', function(event) {
+    window.clearSelectedInputGroup();
+});
+
 export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
     const phase = phaseLabel || `L${idx + 1}`;
     const freqDisplay = (getGlobalFrequencyHz(AppState) !== null) ? `${getGlobalFrequencyHz(AppState)} Hz` : '';
@@ -148,6 +202,13 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
 
     return `
         <div class="accordion-item bg-transparent border-0">
+            <style>
+                .selected {
+                    outline: 2px solid #0d6efd;
+                    border-radius: 0.375rem;
+                    box-shadow: 0 0 0.25rem rgba(13, 110, 253, 0.25);
+                }
+            </style>
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
@@ -170,12 +231,11 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                 <div class="accordion-body bg-dark py-2">
                     <div class="row">
                         <div class="col py-2">
-                            <canvas id="${chartCanvasId}" width="340" height="80" style="display:block;margin:auto;"></canvas>
+                            <canvas id="${chartCanvasId}" width="340" height="80" style="display:block;margin:auto;cursor:pointer;" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('voltage')}"></canvas>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-6 pe-1">
-                            <button class="btn btn-outline-info fw-bold w-100 mb-2 ${voltageSelected}" type="button" style="min-width:48px" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('voltage')}">Voltage</button>
                             <button class="btn btn-outline-info w-100" type="button" id="harmonics_a_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_a_offcanvas_${idx}">
                                 <table class="table table-sm table-borderless mb-0">
                                     <tbody>
@@ -185,7 +245,6 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                             </button>
                         </div>
                         <div class="col-6 ps-1">
-                            <button class="btn btn-outline-warning fw-bold w-100 mb-2 ${currentSelected}" type="button" style="min-width:48px" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('current')}">Current</button>
                             <button class="btn btn-outline-warning w-100" type="button" id="harmonics_b_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_b_offcanvas_${idx}">
                                 <table class="table table-sm table-borderless mb-0">
                                     <tbody>
@@ -201,87 +260,66 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                             <h5 class="offcanvas-title py-1 fs-6" id="${offcanvasId('voltage')}_label">Set Voltage (L${idx + 1})</h5>
                             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
                         </div>
-                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden;">
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">V</div>
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, -10)">-10</button>
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, -1)">-1</button>
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, -0.1)">-0.1</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)}">
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, 0.1)">+0.1</button>
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, 1)">+1</button>
-                                <button class="btn btn-outline-info p-2" type="button" style="min-width:68px" onclick="window.incrementVoltage && window.incrementVoltage(${idx}, 10)">+10</button>
-                                <div class="input-group-text text-muted" style="min-width:120px">0 - 240 V<sub>rms</sub></div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetVoltage && window.resetVoltage(${idx})"><span class="bi bi-arrow-clockwise"></span></button>
-                            </div>
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">&Phi;</div>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', -10)">-10</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', -1)">-1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', -0.1)">-0.1</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)}">
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', 0.1)">+0.1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', 1)">+1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'a', 10)">+10</button>
-                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetPhase && window.resetPhase(${idx}, 'a')"><span class="bi bi-arrow-clockwise"></span></button>
-                            </div>
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">f</div>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-10)">-10</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-1)">-1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-0.1)">-0.1</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)}">
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(0.1)">+0.1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(1)">+1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(10)">+10</button> 
-                                <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetFrequency && window.resetFrequency()"><span class="bi bi-arrow-clockwise"></span></button>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Offcanvas for Current -->
-                    <div class="offcanvas offcanvas-bottom" style="height:45vh" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('current')}" aria-labelledby="${offcanvasId('current')}_label">
-                        <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
-                            <h5 class="offcanvas-title py-1 fs-6" id="${offcanvasId('current')}_label">Set Current (L${idx + 1})</h5>
-                            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-                        </div>
-                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden;">
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">I</div>
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, -1)">-1</button>
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, -0.1)">-0.1</button>
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, -0.01)">-0.01</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)}">
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, 0.01)">+0.01</button>
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, 0.1)">+0.1</button>
-                                <button class="btn btn-outline-warning p-2" type="button" style="min-width:68px" onclick="window.incrementCurrent && window.incrementCurrent(${idx}, 1)">+1</button>
-                                <div class="input-group-text text-muted" style="min-width:120px">0 - 10 A<sub>rms</sub></div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetCurrent && window.resetCurrent(${idx})"><span class="bi bi-arrow-clockwise"></span></button>
-                            </div>
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;</div>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', -10)">-10</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', -1)">-1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', -0.1)">-0.1</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="phase_b_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)}">
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', 0.1)">+0.1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', 1)">+1</button>
-                                <button class="btn btn-outline-light p-2" type="button" style="min-width:68px" onclick="window.incrementPhase && window.incrementPhase(${idx}, 'b', 10)">+10</button>
-                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetPhase && window.resetPhase(${idx}, 'b')"><span class="bi bi-arrow-clockwise"></span></button>
-                            </div>
-                            <div class="input-group mb-2 justify-content-center">
-                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style: italic; font-family: Cambria;">f</div>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-10)">-10</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-1)">-1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(-0.1)">-0.1</button>
-                                <input type="text" class="form-control text-center mx-1 fs-5" style="width:90px;max-width:90px;" id="frequency_b_input_${idx}" value="${synth.frequency_b?.toFixed(1) ?? ''}" onblur="window.setFrequencyDirect && window.setFrequencyDirect(${idx}, 'b', this.value)" onkeydown="if(event.key==='Enter'){window.setFrequencyDirect && window.setFrequencyDirect(${idx}, 'b', this.value)}">
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(0.1)">+0.1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(1)">+1</button>
-                                <button class="btn btn-outline-success p-2" type="button" style="min-width:68px" onclick="window.incrementFrequency && window.incrementFrequency(10)">+10</button>
-                                <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
-                                <button class="btn btn-outline-danger p-2 ms-4" type="button" onclick="window.resetFrequency && window.resetFrequency()"><span class="bi bi-arrow-clockwise"></span></button>
+                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden; overflow-x:hidden;">
+                            <div class="row justify-content-center">
+                                <div class="col-9">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="voltage_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'voltage')">
+                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">V</div>
+                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setVoltageDirect && window.setVoltageDirect(${idx}, this.value)}">
+                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 240 V<sub>rms</sub></div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="current_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'b', 'current')">
+                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">I</div>
+                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setCurrentDirect && window.setCurrentDirect(${idx}, this.value)}">
+                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 10 A<sub>rms</sub></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="phase_a_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'phase')">
+                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
+                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'a', this.value)}">
+                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="phase_b_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'b', 'phase')">
+                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
+                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)" onkeydown="if(event.key==='Enter'){window.setPhaseDirect && window.setPhaseDirect(${idx}, 'b', this.value)}">
+                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row justify-content-center">
+                                        <div class="col-6">
+                                            <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="frequency_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'frequency')">
+                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">f</div>
+                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)" onkeydown="if(event.key==='Enter'){window.setFrequencyDirect && window.setFrequencyDirect(${idx}, this.value)}">
+                                                <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-3">
+                                    <div class="row">
+                                        <div class="col-auto text-center">
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-10)">−10</button>
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-1)">−1</button>
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-0.1)">−0.1</button>
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(0.1)">+0.1</button>
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(1)">+1</button>
+                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(10)">+10</button>
+                                            <button class="btn btn-outline-danger p-2" type="button" onclick="window.resetSelectedInputGroup && window.resetSelectedInputGroup()">
+                                            <span class="bi bi-arrow-clockwise"></span> Reset
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
