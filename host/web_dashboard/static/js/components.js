@@ -16,11 +16,11 @@ export function CombinedWaveformChart(synth, canvasId) {
     const N = 200;
     const x = Array.from({ length: (N * cycles) }, (_, i) => i / N);
     function sumHarmonics(t, peak, phase, harmonics) {
-        let y = peak * Math.sin(2 * Math.PI * t + (phase * Math.PI / 180));
-        if (Array.isArray(harmonics)) {
+        let y = peak * Math.sin(2 * Math.PI * frequencyA/40 * t + (phase * Math.PI / 180));
+        if (Array.isArray(harmonics)) {scaledAmplitudeA 
             harmonics.forEach(h => {
                 const harmPeak = peak * (h.amplitude / 100);
-                y += harmPeak * Math.sin(2 * Math.PI * h.order * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
+                y += harmPeak * Math.sin(2 * Math.PI * h.order * frequencyA/40 * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
             });
         }
         return y;
@@ -127,7 +127,6 @@ export function getGlobalFrequencyHz(AppState) {
 window.selectedInputGroup = { idx: null, channel: null, type: null };
 
 window.setSelectedInputGroup = function(idx, channel, type) {
-    console.log(`Setting selected input group: idx=${idx}, channel=${channel}, type=${type}`);
     window.selectedInputGroup = { idx, channel, type };
     document.querySelectorAll('.selectable-input-group').forEach(e => {
         e.classList.remove('selected');
@@ -144,6 +143,7 @@ window.setSelectedInputGroup = function(idx, channel, type) {
             group.classList.add('selected');
         }
     }
+    document.getElementById(`increment_buttons_${idx}`).innerHTML = renderIncrementButtons();
 };
 
 window.clearSelectedInputGroup = function() {
@@ -171,6 +171,57 @@ window.resetSelectedInputGroup = function() {
     if (type === 'frequency' && window.resetFrequency) window.resetFrequency();
 };
 
+function renderIncrementButtons() {
+    // Store current adjustment index in window
+    if (window.incrementAdjustmentIndex === undefined) window.incrementAdjustmentIndex = 0;
+    const multiplier = (window.selectedInputGroup.type === 'current') ? 0.1 : 1;
+
+    function round(val) {return +val.toFixed(3);}
+
+    // Adjustment levels
+    const adjustmentLevels = [
+        { label: "Coarse", value: round(multiplier * 10) },
+        { label: "Fine", value: round(multiplier * 1) },
+        { label: "Very Fine" , value: round(multiplier * 0.1) }
+    ];
+
+    const adjustment = adjustmentLevels[window.incrementAdjustmentIndex];
+
+    // Toggle function
+    window.toggleIncrementAdjustment = function() {
+        window.incrementAdjustmentIndex = (window.incrementAdjustmentIndex + 1) % adjustmentLevels.length;
+        // Re-render buttons if needed
+        document.querySelectorAll('[id^="increment_buttons_"]').forEach(e => {
+            if (typeof window.selectedInputGroup.idx === 'number') {
+                e.innerHTML = renderIncrementButtons();
+            }
+        });
+    };
+
+    return `
+        <div class="d-flex flex-column gap-2">
+            <button class="btn btn-outline-info p-2 btn-lg" type="button"
+                onclick="window.incrementSelectedInputGroup(${round(adjustment.value)})">
+                <span class="bi bi-arrow-up"></span>
+            </button>
+            <button class="btn btn-outline-info p-2 btn-lg" type="button"
+                onclick="window.incrementSelectedInputGroup(${round(-adjustment.value)})">
+                <span class="bi bi-arrow-down"></span>
+            </button>
+            <div class="d-flex flex-row gap-2">
+                <button class="btn btn-outline-light p-2 w-50" type="button"
+                    onclick="window.toggleIncrementAdjustment()">
+                    <i class="bi bi-plus-slash-minus"></i> ${adjustment.value}
+                </button>
+                <button class="btn btn-outline-danger p-2 w-50" type="button"
+                    onclick="window.resetSelectedInputGroup()">
+                    <span class="bi bi-arrow-clockwise"></span>
+                </button>
+            </div>
+        </div>
+    `;
+};
+
 // listener for offcanvas close events
 document.addEventListener('hidden.bs.offcanvas', function(event) {
     window.clearSelectedInputGroup();
@@ -195,24 +246,38 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
         if (mode.synth === synthIdx && (mode.ch === 'all' || mode.ch === channel)) return true;
         return false;
     }
-    const voltageSelected = highlightIfSelected('voltage', idx, 'a') ? 'bg-info-subtle border-info border-2' : '';
-    const currentSelected = highlightIfSelected('current', idx, 'b') ? 'bg-warning-subtle border-warning border-2' : '';
-    const phaseSelected = (highlightIfSelected('phase', idx, 'a') || highlightIfSelected('phase', idx, 'b')) ? 'bg-secondary-subtle border-secondary border-2' : '';
-    const frequencySelected = highlightIfSelected('frequency', idx, 'all') ? 'bg-light-subtle border-light border-2' : '';
+    const voltageSelected = highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : '';
+    const currentSelected = highlightIfSelected('current', idx, 'b') ? 'highlighted' : '';
+    const phaseSelected = (highlightIfSelected('phase', idx, 'a') || highlightIfSelected('phase', idx, 'b')) ? 'highlighted' : '';
+    const frequencySelected = highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : '';
 
     return `
         <div class="accordion-item bg-transparent border-0">
             <style>
                 .selected {
-                    outline: 2px solid #0d6efd;
+                    outline: 2px solid var(--bs-info);
                     border-radius: 0.375rem;
-                    box-shadow: 0 0 0.25rem rgba(13, 110, 253, 0.25);
+                    box-shadow: 0 0 0.5rem var(--bs-info);
+                }
+                .highlighted {
+                    position: relative;
+                    font-weight: bold;
+                    color: inherit;
+                }
+                .highlighted::before {
+                        content: '';
+                        position: absolute;
+                        left: 10px; top: -5px; right: -5px; bottom: -5px;
+                        border: 2px solid var(--bs-info);
+                        border-radius: 0.25em;
+                        pointer-events: none;
+                        box-sizing: border-box;
                 }
             </style>
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
-                    <div class="col-2 text-end">${freqDisplay}</div>
+                    <div class="col-2 text-end ${frequencySelected}">${freqDisplay}</div>
                     <div class="col pe-4">
                         <div class="row text-info">
                             <div class="col text-end ${voltageSelected}">${scaledAmplitudeA.toFixed(1)} V</div>
@@ -231,7 +296,7 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                 <div class="accordion-body bg-dark py-2">
                     <div class="row">
                         <div class="col py-2">
-                            <canvas id="${chartCanvasId}" width="340" height="80" style="display:block;margin:auto;cursor:pointer;" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('voltage')}"></canvas>
+                            <canvas id="${chartCanvasId}" width="340" height="80" style="display:block;margin:auto;cursor:pointer;" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}"></canvas>
                         </div>
                     </div>
                     <div class="row">
@@ -254,15 +319,15 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                             </button>
                         </div>
                     </div>
-                    <!-- Offcanvas for Voltage -->
-                    <div class="offcanvas offcanvas-bottom" style="height:45vh" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('voltage')}" aria-labelledby="${offcanvasId('voltage')}_label">
+                    <!-- Offcanvas for Waveform -->
+                    <div class="offcanvas offcanvas-bottom" style="height:45vh" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('waveform')}" aria-labelledby="${offcanvasId('waveform')}_label">
                         <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
-                            <h5 class="offcanvas-title py-1 fs-6" id="${offcanvasId('voltage')}_label">Set Voltage (L${idx + 1})</h5>
+                            <h5 class="offcanvas-title py-1 fs-6" id="${offcanvasId('waveform')}_label">Set Waveform (L${idx + 1})</h5>
                             <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
                         </div>
-                        <div class="offcanvas-body d-flex flex-column align-items-center p-2" style="overflow-y:hidden; overflow-x:hidden;">
-                            <div class="row justify-content-center">
-                                <div class="col-9">
+                        <div class="offcanvas-body p-2" style="overflow-y:hidden; overflow-x:hidden;">
+                            <div class="row justify-content-center px-2">
+                                <div class="col-auto">
                                     <div class="row">
                                         <div class="col-6">
                                             <div class="input-group mb-2 justify-content-center selectable-input-group" tabindex="0" id="voltage_group_${idx}" onclick="window.setSelectedInputGroup && window.setSelectedInputGroup(${idx}, 'a', 'voltage')">
@@ -305,18 +370,10 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-3">
+                                <div class="col">
                                     <div class="row">
-                                        <div class="col-auto text-center">
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-10)">−10</button>
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-1)">−1</button>
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(-0.1)">−0.1</button>
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(0.1)">+0.1</button>
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(1)">+1</button>
-                                            <button class="btn btn-outline-info p-2" type="button" onclick="window.incrementSelectedInputGroup && window.incrementSelectedInputGroup(10)">+10</button>
-                                            <button class="btn btn-outline-danger p-2" type="button" onclick="window.resetSelectedInputGroup && window.resetSelectedInputGroup()">
-                                            <span class="bi bi-arrow-clockwise"></span> Reset
-                                            </button>
+                                        <div class="col" id="increment_buttons_${idx}">
+                                            ${renderIncrementButtons()}
                                         </div>
                                     </div>
                                 </div>
