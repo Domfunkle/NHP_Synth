@@ -26,7 +26,7 @@
         } from './static/js/api.js';
 
         import {
-            CombinedWaveformChart,
+            SynthWaveformChart,
             renderHarmonics,
             SynthAccordionItem,
             SynthCardsRow,
@@ -135,7 +135,7 @@
                     cardsRow.innerHTML = SynthCardsRow(AppState);
                     // After DOM update, render combined waveforms for each synth
                     AppState.synthState.synths.forEach((synth, idx) => {
-                        CombinedWaveformChart(synth, `waveform_combined_${idx}`);
+                        SynthWaveformChart(synth, `waveform_combined_${idx}`);
                     });
                     console.log(AppState);
 
