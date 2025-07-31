@@ -165,17 +165,10 @@ window.incrementSelected = function(delta) {
     if (type === 'current' && window.incrementCurrent) window.incrementCurrent(idx, delta);
     if (type === 'phase' && window.incrementPhase) window.incrementPhase(idx, channel, delta);
     if (type === 'frequency' && window.incrementFrequency) window.incrementFrequency(delta);
-    if (type.startsWith('harmonic_order_') && window.incrementHarmonicOrder) {
-        const harmonicId = +type.split('_')[2];
-        window.incrementHarmonicOrder(idx, channel, harmonicId, delta);
-    }
-    if (type.startsWith('harmonic_amp_') && window.incrementHarmonicAmplitude) {
+    if (type.startsWith('harmonic') && window.incrementHarmonic) {
         const harmonicId = type.split('_')[2];
-        window.incrementHarmonicAmplitude(idx, channel, harmonicId, delta);
-    }
-    if (type.startsWith('harmonic_phase_') && window.incrementHarmonicPhase) {
-        const harmonicId = type.split('_')[2];
-        window.incrementHarmonicPhase(idx, channel, harmonicId, delta);
+        const property = type.split('_')[1];
+        window.incrementHarmonic(idx, channel, harmonicId, delta, property);
     }
 };
 
@@ -305,13 +298,12 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
 
     function highlightIfSelected(func, synthIdx, channel) {
         const mode = selectionMode[func];
-        if (func === 'phase') console.log(`highlightIfSelected: func=${func}, synthIdx=${synthIdx}, channel=${channel}, mode=${JSON.stringify(mode)}`);
         if (!mode) return '';
         if (mode.synth === 'all') return '';
         if (mode.synth === synthIdx && (mode.ch === 'all' || mode.ch === channel)) return true;
         return false;
     }
-    
+
     return `
         <div class="accordion-item bg-transparent border-0">
             <style>

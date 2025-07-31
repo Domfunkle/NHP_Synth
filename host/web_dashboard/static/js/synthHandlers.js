@@ -189,31 +189,53 @@ export async function resetFrequency() {
     }
 }
 
-export async function incrementHarmonicOrder(idx, channel, id, delta) {
+
+/**
+ * Increment a harmonic property (order, amplitude, or phase) for a given synth.
+ * @param {number} idx - Synth index
+ * @param {string} channel - 'a' or 'b'
+ * @param {string|number} id - Harmonic id
+ * @param {number} delta - Amount to increment
+ * @param {'order'|'amplitude'|'phase'} property - Which property to increment
+ */
+export async function incrementHarmonic(idx, channel, id, delta, property) {
     const synthState = getSynthState();
     if (!synthState || !synthState.synths || !synthState.synths[idx]) {
-        console.error('incrementHarmonicOrder: synth is undefined for idx', idx);
+        console.error('incrementHarmonic: synth is undefined for idx', idx);
         return;
     }
     const synth = synthState.synths[idx];
     if (typeof synth.id === 'undefined') {
-        console.error('incrementHarmonicOrder: synth.id is undefined for idx', idx, synth);
+        console.error('incrementHarmonic: synth.id is undefined for idx', idx, synth);
         return;
     }
     if (typeof channel !== 'string' || !['a', 'b'].includes(channel)) {
-        console.error('incrementHarmonicOrder: invalid channel', channel);
+        console.error('incrementHarmonic: invalid channel', channel);
         return;
     }
-    const maxOrder = 127; // Assuming max order is 127
     // find the index of the harmonic by id
-    const index = synth[`harmonics_${channel}`]?.findIndex(h => h.id === id);
-
+    const index = synth[`harmonics_${channel}`]?.findIndex(h => h.id == id);
     let order = synth[`harmonics_${channel}`]?.[index]?.order ?? 1;
     let amplitude = synth[`harmonics_${channel}`]?.[index]?.amplitude ?? 0;
     let phase = synth[`harmonics_${channel}`]?.[index]?.phase ?? 0;
 
-    order += delta;
-    order = Math.max(1, Math.min(maxOrder, order));
+    if (property === 'order') {
+        const maxOrder = 127;
+        order += delta;
+        order = Math.max(1, Math.min(maxOrder, order));
+        order = +order.toFixed(0);
+    } else if (property === 'amp') {
+        amplitude += delta;
+        amplitude = Math.max(0, Math.min(100, amplitude));
+        amplitude = +amplitude.toFixed(2);
+    } else if (property === 'phase') {
+        phase += delta;
+        phase = ((phase % 360) + 360) % 360;
+        phase = +phase.toFixed(2);
+    } else {
+        console.error('incrementHarmonic: invalid property', property);
+        return;
+    }
     const value = { id, order, amplitude, phase };
     await setSynthHarmonics(synth.id, channel, value);
 }
