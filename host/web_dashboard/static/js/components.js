@@ -323,13 +323,18 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                     color: inherit;
                 }
                 .highlighted::before {
-                        content: '';
-                        position: absolute;
-                        left: 10px; top: -5px; right: -5px; bottom: -5px;
-                        border: 2px solid var(--bs-info);
-                        border-radius: 0.25em;
-                        pointer-events: none;
-                        box-sizing: border-box;
+                    content: '';
+                    position: absolute;
+                    border: 2px solid var(--bs-info);
+                    border-radius: 0.25em;
+                    pointer-events: none;
+                    box-sizing: border-box;
+                }
+                .highlighted.btn::before {
+                    left: -10px; top: -10px; right: -10px; bottom: -10px;
+                }
+                .highlighted:not(.btn)::before {
+                    left: 10px; top: -5px; right: -5px; bottom: -5px;
                 }
             </style>
             <h2 class="accordion-header" id="${headingId}">
@@ -359,7 +364,7 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                     </div>
                     <div class="row">
                         <div class="col-6 pe-1">
-                            <button class="btn btn-outline-info w-100" type="button" id="harmonics_a_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_a_offcanvas_${idx}">
+                            <button class="btn btn-outline-info w-100 ${highlightIfSelected('harmonics', idx, 'a') ? 'highlighted' : ''}" type="button" id="harmonics_a_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_a_offcanvas_${idx}">
                                 <table class="table table-sm table-borderless mb-0">
                                     <tbody>
                                         ${renderHarmonics(synth.harmonics_a)}
@@ -367,8 +372,8 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                                 </table>
                             </button>
                         </div>
-                        <div class="col-6 ps-1">
-                            <button class="btn btn-outline-warning w-100" type="button" id="harmonics_b_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_b_offcanvas_${idx}">
+                        <div class="col-6 ps-1}">
+                            <button class="btn btn-outline-warning w-100 ${highlightIfSelected('harmonics', idx, 'b') ? 'highlighted' : ''}" type="button" id="harmonics_b_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_b_offcanvas_${idx}">
                                 <table class="table table-sm table-borderless mb-0">
                                     <tbody>
                                         ${renderHarmonics(synth.harmonics_b)}
