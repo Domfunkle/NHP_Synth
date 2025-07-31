@@ -93,6 +93,31 @@ export function CombinedWaveformChart(synth, canvasId) {
     });
 }
 
+// Calculate DPF (Displacement Power Factor) based on phases
+export function DPF(phaseA, phaseB) {
+    const cosPhi = Math.cos((phaseA - phaseB) * Math.PI / 180);
+    return +cosPhi;
+}
+
+// Calculate THD (Total Harmonic Distortion) for a given set of harmonics
+export function THD(harmonics) {
+    if (!Array.isArray(harmonics) || harmonics.length === 0) return 1;
+    const fundamentalAmplitude = 100;
+    const totalHarmonics = harmonics.reduce((sum, h) => sum + (h.amplitude ** 2), 0);
+    const thd = Math.sqrt(totalHarmonics) / fundamentalAmplitude;
+    return +thd;
+}
+
+// Calculate True Power Factor (PF) based THDi and displacement power factor
+export function truePF(phaseA, phaseB, harmonics=[]) {
+    const dpfValue = DPF(phaseA, phaseB);
+    const pf_thd = (Array.isArray(harmonics) && harmonics.length > 0)
+        ? Math.sqrt(1 / (1 + THD(harmonics) ** 2))
+        : 1;
+    return +(pf_thd * dpfValue);
+}
+
+
 export function renderHarmonics(harmonics) {
     let cells = [];
     if (Array.isArray(harmonics) && harmonics.length > 0) {
@@ -340,17 +365,25 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
-                    <div class="col-2 text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}">${freqDisplay}</div>
-                    <div class="col pe-4">
+                    <div class="col-auto text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}">${freqDisplay}</div>
+                    <div class="col pe-3">
                         <div class="row text-info">
                             <div class="col text-end ${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}">${scaledAmplitudeA.toFixed(1)} V</div>
                             <div class="col-1 text-end">&ang;</div>
-                            <div class="col text-end ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}">${synth.phase_a + '°'}</div>
+                            <div class="col-4 text-end ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}">${synth.phase_a + '°'}</div>
                         </div>
                         <div class="row text-warning">
                             <div class="col text-end ${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}">${scaledAmplitudeB.toFixed(2)} A</div>
                             <div class="col-1 text-end">&ang;</div>
-                            <div class="col text-end ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}">${synth.phase_b + '°'}</div>
+                            <div class="col-4 text-end ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}">${synth.phase_b + '°'}</div>
+                        </div>
+                    </div>
+                    <div class="col-auto pe-1 text-end">
+                        <div class="row text-light">
+                            <div class="col text-light">&phi; ${DPF(synth.phase_a, synth.phase_b).toFixed(3)}</div>
+                        </div>
+                        <div class="row text-light">
+                            <div class="col text-end">PF ${truePF(synth.phase_a, synth.phase_b, synth.harmonics_b).toFixed(3)}</div>
                         </div>
                     </div>
                 </button>
