@@ -1,7 +1,5 @@
 // synthHandlers.js
 // All event handler functions for synth controls
-import { setSynthAmplitude, setSynthFrequency, setSynthPhase, getDefaults, setSynthHarmonics } from './api.js';
-import { getSynthState } from './state.js';
 
 export async function incrementVoltage(idx, delta) {
     const synthState = getSynthState();
@@ -158,6 +156,7 @@ export async function incrementFrequency(delta) {
 }
 
 export async function setFrequencyDirect(value) {
+    console.log('setFrequencyDirect', value);
     const synthState = getSynthState();
     if (!synthState || !synthState.synths) {
         console.error('setFrequencyDirect: synths are undefined');
@@ -239,3 +238,4 @@ export async function incrementHarmonic(idx, channel, id, delta, property) {
     const value = { id, order, amplitude, phase };
     await setSynthHarmonics(synth.id, channel, value);
 }
+

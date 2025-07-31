@@ -13,70 +13,8 @@
 </head>
 
 <body>
+    <script type="module" src="static/js/globals.js"></script>
     <script type="module">
-        import {
-            apiPost,
-            setSynthAmplitude,
-            setSynthFrequency,
-            setSynthPhase,
-            setSynthHarmonics,
-            sendSynthCommand,
-            synthStateEquals,
-            setSocket
-        } from './static/js/api.js';
-
-        import {
-            renderHarmonics,
-            SynthAccordionItem,
-            SynthCardsRow,
-            LoadingSpinner
-        } from './static/js/components.js';
-
-        import {
-            SynthWaveformChart
-        } from './static/js/charts.js';
-
-        import {
-            AppState,
-            setSynthState,
-            setOpenAccordionId,
-            setOpenOffcanvasId,
-            setSelectedId,
-            getSynthState,
-            getOpenAccordionId,
-            getOpenOffcanvasId,
-            getSelectedId
-        } from './static/js/state.js';
-
-        import {
-            incrementVoltage,
-            setVoltageDirect,
-            resetVoltage,
-            incrementCurrent,
-            setCurrentDirect,
-            resetCurrent,
-            incrementPhase,
-            setPhaseDirect,
-            resetPhase,
-            incrementFrequency,
-            setFrequencyDirect,
-            resetFrequency,
-            incrementHarmonic
-        } from './static/js/synthHandlers.js';
-
-        window.incrementVoltage = incrementVoltage;
-        window.setVoltageDirect = setVoltageDirect;
-        window.resetVoltage = resetVoltage;
-        window.incrementCurrent = incrementCurrent;
-        window.setCurrentDirect = setCurrentDirect;
-        window.resetCurrent = resetCurrent;
-        window.incrementPhase = incrementPhase;
-        window.setPhaseDirect = setPhaseDirect;
-        window.resetPhase = resetPhase;
-        window.incrementFrequency = incrementFrequency;
-        window.setFrequencyDirect = setFrequencyDirect;
-        window.resetFrequency = resetFrequency;
-        window.incrementHarmonic = incrementHarmonic;
 
         // --- Accordion & Offcanvas State Persistence ---
         setOpenAccordionId(null);
@@ -138,7 +76,7 @@
                     cardsRow.innerHTML = SynthCardsRow(AppState);
                     // After DOM update, render combined waveforms for each synth
                     AppState.synthState.synths.forEach((synth, idx) => {
-                        SynthWaveformChart(synth, `waveform_combined_${idx}`);
+                        synthWaveformChart(synth, `waveform_combined_${idx}`);
                     });
                     console.log(AppState);
 

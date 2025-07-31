@@ -8,7 +8,7 @@ export function setSocket(s) { socketInstance = s; }
  * @param {string} endpoint
  * @returns {Promise<object>}
  */
-export async function apiGet(endpoint) {
+async function apiGet(endpoint) {
     const response = await fetch(endpoint);
     if (!response.ok) {
         const errorText = await response.text();
@@ -23,7 +23,7 @@ export async function apiGet(endpoint) {
  * @param {object} data
  * @returns {Promise<object>}
  */
-export async function apiPost(endpoint, data) {
+async function apiPost(endpoint, data) {
     const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,7 +46,7 @@ export async function apiPost(endpoint, data) {
  * @param {function} [callback] - Optional callback function to handle the response
  * @returns {void}
  */
-export function sendSynthCommandWS(socket, synthId, command, channel, value, callback) {
+function sendSynthCommandWS(socket, synthId, command, channel, value, callback) {
     const payload = {
         synth_id: synthId,
         command: command,
@@ -109,7 +109,7 @@ export async function setSynthHarmonics(synthId, channel, value) {
  * @param {string} channel
  * @param {number|Array|String} value
  */
-export async function sendSynthCommand(synthId, command, channel, value) {
+async function sendSynthCommand(synthId, command, channel, value) {
     return apiPost(`/api/synths/${synthId}/command`, { command, channel, value });
 }
 

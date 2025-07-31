@@ -1,7 +1,7 @@
 // Chart rendering for NHP Synth Dashboard
 // Exported as ES module
 
-export function SynthWaveformChart(synth, canvasId) {
+export function synthWaveformChart(synth, canvasId) {
     const amplitudeA = synth.amplitude_a, frequencyA = synth.frequency_a, phaseA = synth.phase_a;
     const amplitudeB = synth.amplitude_b, frequencyB = synth.frequency_b, phaseB = synth.phase_b;
     if ([amplitudeA, frequencyA, phaseA, amplitudeB, frequencyB, phaseB].some(v => v === undefined)) return;
