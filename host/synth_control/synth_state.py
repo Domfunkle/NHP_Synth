@@ -42,13 +42,12 @@ class SynthStateManager:
                 "frequency_b": 50.0,
                 "phase_a": 0.0 if i == 0 else (120.0 if i == 1 else 240.0),
                 "phase_b": 0.0 if i == 0 else (120.0 if i == 1 else 240.0),
-                "harmonics_a": [
-                    {"id": 0, "order": 3, "amplitude": 0, "phase": 0},
-                    {"id": 1, "order": 5, "amplitude": 0, "phase": 0}
-                ],
+                "harmonics_a": [],
                 "harmonics_b": [
-                    {"id": 0, "order": 3, "amplitude": 0, "phase": 180},
-                    {"id": 1, "order": 5, "amplitude": 0, "phase": 180}
+                    {"id": 0, "order": 5, "amplitude": 0, "phase": 0},
+                    {"id": 1, "order": 7, "amplitude": 0, "phase": 0},
+                    {"id": 2, "order": 11, "amplitude": 0, "phase": 0},
+                    {"id": 3, "order": 13, "amplitude": 0, "phase": 0}
                 ]
             })
 
