@@ -8,7 +8,7 @@ class SynthStateManager:
     def __init__(self, state_file, defaults_file):
         self.state_file = state_file
         self.defaults_file = defaults_file
-        self.defaults = self.load_defaults()
+        self.defaults = self.load_defaults()  # Load defaults from file or use hardcoded defaults
         self.num_synths = 0
         self.synths = copy.deepcopy(self.defaults)  # List of synth dicts, one per synth
         self.selection_mode = None
@@ -21,7 +21,7 @@ class SynthStateManager:
     def _return_defaults(self):
         """Save and Return the default synths configuration."""
         self.save_defaults()
-        return self.defaults
+        return copy.deepcopy(self.defaults)
 
     def save_defaults(self):
         """Save the defaults to the defaults JSON file."""
