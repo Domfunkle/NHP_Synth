@@ -63,4 +63,9 @@ export function resetSelected() {
     if (type === 'current') resetCurrent(idx);
     if (type === 'phase') resetPhase(idx, channel);
     if (type === 'frequency') resetFrequency();
+    if (type.startsWith('harmonic')) {
+        const harmonicId = +type.split('_')[2];
+        const property = type.split('_')[1];
+        resetHarmonic(idx, channel, harmonicId, property);
+    }
 }

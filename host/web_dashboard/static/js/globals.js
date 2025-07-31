@@ -18,7 +18,8 @@ import {
     incrementVoltage, setVoltageDirect, resetVoltage, 
     incrementCurrent, resetCurrent, setCurrentDirect,
     incrementPhase, setPhaseDirect, resetPhase,
-    incrementFrequency, setFrequencyDirect, resetFrequency, incrementHarmonic
+    incrementFrequency, setFrequencyDirect, resetFrequency,
+    incrementHarmonic, resetHarmonic
 } from './components/synthHandlers.js';
 
 // State Management
@@ -67,6 +68,7 @@ window.incrementFrequency = incrementFrequency;
 window.setFrequencyDirect = setFrequencyDirect;
 window.resetFrequency = resetFrequency;
 window.incrementHarmonic = incrementHarmonic;
+window.resetHarmonic = resetHarmonic;
 
 // State Management
 window.AppState = AppState;

@@ -28,20 +28,20 @@ export function incrementButtons() {
     return `
         <div class="d-flex flex-column gap-2">
             <button class="btn btn-outline-info p-2 btn-lg" type="button"
-                onclick="window.incrementSelected(${adjustment})">
+                onclick="incrementSelected(${adjustment})">
                 <span class="bi bi-arrow-up"></span>
             </button>
             <button class="btn btn-outline-info p-2 btn-lg" type="button"
-                onclick="window.incrementSelected(${-adjustment})">
+                onclick="incrementSelected(${-adjustment})">
                 <span class="bi bi-arrow-down"></span>
             </button>
             <div class="d-flex flex-row gap-2">
                 <button class="btn btn-outline-light p-2 w-50" type="button"
-                    onclick="window.toggleIncrementAdjustment()">
+                    onclick="toggleIncrementAdjustment()">
                     <i class="bi bi-plus-slash-minus"></i> ${adjustment}
                 </button>
                 <button class="btn btn-outline-danger p-2 w-50" type="button"
-                    onclick="window.resetSelected()">
+                    onclick="resetSelected()">
                     <span class="bi bi-arrow-clockwise"></span>
                 </button>
             </div>
