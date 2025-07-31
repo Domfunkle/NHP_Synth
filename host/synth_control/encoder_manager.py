@@ -155,7 +155,7 @@ class EncoderManager:
 
                 for ch in harmonics_channels:
                     synth_interface[synth_id].clear_harmonics(ch)
-                    
+
                     harmonics_key = f'harmonics_{ch}'
                     default_harmonics = defaults[synth_id].get(harmonics_key, [])
                     synth_harmonics = synths[synth_id].get(harmonics_key, [])
@@ -325,26 +325,56 @@ class EncoderManager:
                     self.synth_interface[i].set_frequency(ch, new_freq)
 
     def _handle_harmonics(self, delta, mode):
-        # Handle "all" channel: apply to both 'a' and 'b'
         channels = ['a', 'b'] if mode['ch'] == 'all' else [mode['ch']]
-        would_exceed = False
-        for ch in channels:
-            harmonics_key = f'harmonics_{ch}'
-            logger.info(f"[{mode}][harmonics] Rotated {delta} (adjust harmonics for channel {ch})")
-            would_exceed = any(
-                (self.state.synths[i][harmonics_key][j]['amplitude'] + delta) < 0 or
-                (self.state.synths[i][harmonics_key][j]['amplitude'] + delta) > 100
-                for i in range(self.state.num_synths)
-                for j in range(len(self.state.synths[i][harmonics_key]))
-            )
-            if would_exceed:
-                logger.info("At least one synth/channel would exceed harmonics bounds, skipping command.")
-                return
-        for i in range(self.state.num_synths):
+        # Determine which synths to update
+        if mode['synth'] == 'all':
+            # Check bounds for all synths
             for ch in channels:
                 harmonics_key = f'harmonics_{ch}'
-                for j in range(len(self.state.synths[i][harmonics_key])):
-                    harmonic = self.state.synths[i][harmonics_key][j]
+                logger.info(f"[{mode}][harmonics] Rotated {delta} (adjust harmonics for channel {ch})")
+                would_exceed = any(
+                    (self.state.synths[i][harmonics_key][j]['amplitude'] + delta) < 0 or
+                    (self.state.synths[i][harmonics_key][j]['amplitude'] + delta) > 100
+                    for i in range(self.state.num_synths)
+                    for j in range(len(self.state.synths[i][harmonics_key]))
+                )
+                if would_exceed:
+                    logger.info("At least one synth/channel would exceed harmonics bounds, skipping command.")
+                    return
+            for i in range(self.state.num_synths):
+                for ch in channels:
+                    harmonics_key = f'harmonics_{ch}'
+                    for j in range(len(self.state.synths[i][harmonics_key])):
+                        harmonic = self.state.synths[i][harmonics_key][j]
+                        old_amp = harmonic['amplitude']
+                        new_amp = round(max(0, min(100, old_amp + delta)), 2)
+                        harmonic['amplitude'] = new_amp
+                        value = {
+                            'id': harmonic.get('id'),
+                            'order': harmonic.get('order'),
+                            'amplitude': new_amp,
+                            'phase': round(harmonic.get('phase', 0), 2)
+                        }
+                        if old_amp != new_amp:
+                            self.synth_interface[i].set_harmonics(ch, value)
+                            logger.info(f"Updated harmonics for synth {i}, channel {ch}, id {value['id']} order {value['order']} to amplitude {new_amp}")
+            logger.info(f"Applied harmonics changes for all synths on channel(s) {channels}")
+        else:
+            # Only update the selected synth
+            synth_id = mode['synth']
+            for ch in channels:
+                harmonics_key = f'harmonics_{ch}'
+                logger.info(f"[Synth {synth_id}][harmonics] Rotated {delta} (adjust harmonics for channel {ch})")
+                would_exceed = any(
+                    (self.state.synths[synth_id][harmonics_key][j]['amplitude'] + delta) < 0 or
+                    (self.state.synths[synth_id][harmonics_key][j]['amplitude'] + delta) > 100
+                    for j in range(len(self.state.synths[synth_id][harmonics_key]))
+                )
+                if would_exceed:
+                    logger.info("Synth would exceed harmonics bounds, skipping command.")
+                    return
+                for j in range(len(self.state.synths[synth_id][harmonics_key])):
+                    harmonic = self.state.synths[synth_id][harmonics_key][j]
                     old_amp = harmonic['amplitude']
                     new_amp = round(max(0, min(100, old_amp + delta)), 2)
                     harmonic['amplitude'] = new_amp
@@ -355,9 +385,9 @@ class EncoderManager:
                         'phase': round(harmonic.get('phase', 0), 2)
                     }
                     if old_amp != new_amp:
-                        self.synth_interface[i].set_harmonics(ch, value)
-                        logger.info(f"Updated harmonics for synth {i}, channel {ch}, id {value['id']} order {value['order']} to amplitude {new_amp}")
-        logger.info(f"Applied harmonics changes for {mode['synth']} on channel {mode['ch']}")
+                        self.synth_interface[synth_id].set_harmonics(ch, value)
+                        logger.info(f"Updated harmonics for synth {synth_id}, channel {ch}, id {value['id']} order {value['order']} to amplitude {new_amp}")
+            logger.info(f"Applied harmonics changes for synth {synth_id} on channel(s) {channels}")
 
 
     def _handle_generic(self, delta, mode):
