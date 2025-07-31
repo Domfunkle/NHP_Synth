@@ -30,3 +30,7 @@ export function getGlobalFrequencyHz(AppState) {
     }
     return null;
 }
+
+export function LoadingSpinner() {
+    return '<div class="col"><div class="alert alert-info">Waiting for data...</div></div>';
+}

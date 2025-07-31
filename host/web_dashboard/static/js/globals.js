@@ -1,30 +1,48 @@
 // globals.js - Assigns all needed functions to window for inline event handlers
 
-import { setSelected, clearSelected, incrementSelected, resetSelected, SynthCardsRow, LoadingSpinner } from './components/components.js';
-import { setSynthAmplitude, setSynthFrequency, setSynthPhase, setSynthHarmonics, synthStateEquals, getDefaults, setSocket } from './api.js';
+// Components
+import { SynthCardsRow } from './components/components.js';
 import { synthWaveformChart } from './components/charts.js';
 import { harmonicsCells } from './components/harmonicsCells.js';
 import { incrementButtons } from './components/incrementButtons.js';
-import { incrementVoltage, setVoltageDirect, resetVoltage, incrementCurrent, resetCurrent, incrementPhase, setPhaseDirect, resetPhase, incrementFrequency, setFrequencyDirect, resetFrequency, incrementHarmonic, setCurrentDirect } from './components/synthHandlers.js';
-import { AppState, setSynthState, setOpenAccordionId, setOpenOffcanvasId, setSelectedId, getSynthState, getOpenAccordionId, getOpenOffcanvasId, getSelectedId } from './state.js';
-import { DPF, THD, truePF, getGlobalFrequencyHz } from './utils.js';
+import { selected, setSelected, clearSelected, incrementSelected, resetSelected } from './components/selection.js';
+
+// API
+import {
+    setSynthAmplitude, setSynthFrequency, setSynthPhase,
+    setSynthHarmonics, synthStateEquals, getDefaults,setSocket
+} from './api.js';
+
+// Synth Handlers
+import { 
+    incrementVoltage, setVoltageDirect, resetVoltage, 
+    incrementCurrent, resetCurrent, setCurrentDirect,
+    incrementPhase, setPhaseDirect, resetPhase,
+    incrementFrequency, setFrequencyDirect, resetFrequency, incrementHarmonic
+} from './components/synthHandlers.js';
+
+// State Management
+import {
+    AppState, setSynthState, setOpenAccordionId,
+    setOpenOffcanvasId, setSelectedId, getSynthState,
+    getOpenAccordionId, getOpenOffcanvasId, getSelectedId
+} from './state.js';
+
+// Utilities
+import { DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner } from './utils.js';
 
 // Components
+window.SynthCardsRow = SynthCardsRow;
+window.synthWaveformChart = synthWaveformChart;
+window.harmonicsCells = harmonicsCells;
+window.incrementButtons = incrementButtons;
+
+// Selection
+window.selected = selected;
 window.setSelected = setSelected;
 window.clearSelected = clearSelected;
 window.incrementSelected = incrementSelected;
 window.resetSelected = resetSelected;
-window.SynthCardsRow = SynthCardsRow;
-window.LoadingSpinner = LoadingSpinner;
-
-// Charts
-window.synthWaveformChart = synthWaveformChart;
-
-// Harmonics
-window.harmonicsCells = harmonicsCells;
-
-// Increment buttons
-window.incrementButtons = incrementButtons;
 
 // API
 window.setSynthAmplitude = setSynthAmplitude;
@@ -41,6 +59,7 @@ window.setVoltageDirect = setVoltageDirect;
 window.resetVoltage = resetVoltage;
 window.incrementCurrent = incrementCurrent;
 window.resetCurrent = resetCurrent;
+window.setCurrentDirect = setCurrentDirect;
 window.incrementPhase = incrementPhase;
 window.setPhaseDirect = setPhaseDirect;
 window.resetPhase = resetPhase;
@@ -48,9 +67,8 @@ window.incrementFrequency = incrementFrequency;
 window.setFrequencyDirect = setFrequencyDirect;
 window.resetFrequency = resetFrequency;
 window.incrementHarmonic = incrementHarmonic;
-window.setCurrentDirect = setCurrentDirect;
 
-// State management
+// State Management
 window.AppState = AppState;
 window.setSynthState = setSynthState;
 window.setOpenAccordionId = setOpenAccordionId;
@@ -61,8 +79,9 @@ window.getOpenAccordionId = getOpenAccordionId;
 window.getOpenOffcanvasId = getOpenOffcanvasId;
 window.getSelectedId = getSelectedId;
 
-// Utility functions
+// Utilities
 window.DPF = DPF;
 window.THD = THD;
 window.truePF = truePF;
 window.getGlobalFrequencyHz = getGlobalFrequencyHz;
+window.LoadingSpinner = LoadingSpinner;
