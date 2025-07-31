@@ -301,21 +301,17 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
     const headingId = `headingSynth${idx}`;
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
 
-    let selectionMode = (synth.selectionMode) ? synth.selectionMode : {};
+    let selectionMode = (AppState.synthState.selectionMode) ? AppState.synthState.selectionMode : {};
 
     function highlightIfSelected(func, synthIdx, channel) {
         const mode = selectionMode[func];
-        console.log(`highlightIfSelected: func=${func}, synthIdx=${synthIdx}, channel=${channel}, mode=`, mode);
+        if (func === 'phase') console.log(`highlightIfSelected: func=${func}, synthIdx=${synthIdx}, channel=${channel}, mode=${JSON.stringify(mode)}`);
         if (!mode) return '';
         if (mode.synth === 'all') return '';
         if (mode.synth === synthIdx && (mode.ch === 'all' || mode.ch === channel)) return true;
         return false;
     }
-    const voltageSelected = highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : '';
-    const currentSelected = highlightIfSelected('current', idx, 'b') ? 'highlighted' : '';
-    const phaseSelected = (highlightIfSelected('phase', idx, 'a') || highlightIfSelected('phase', idx, 'b')) ? 'highlighted' : '';
-    const frequencySelected = highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : '';
-
+    
     return `
         <div class="accordion-item bg-transparent border-0">
             <style>
@@ -342,17 +338,17 @@ export function SynthAccordionItem({ synth, idx, phaseLabel }, AppState) {
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
-                    <div class="col-2 text-end ${frequencySelected}">${freqDisplay}</div>
+                    <div class="col-2 text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}">${freqDisplay}</div>
                     <div class="col pe-4">
                         <div class="row text-info">
-                            <div class="col text-end ${voltageSelected}">${scaledAmplitudeA.toFixed(1)} V</div>
+                            <div class="col text-end ${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}">${scaledAmplitudeA.toFixed(1)} V</div>
                             <div class="col-1 text-end">&ang;</div>
-                            <div class="col text-end ${phaseSelected}">${synth.phase_a + '°'}</div>
+                            <div class="col text-end ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}">${synth.phase_a + '°'}</div>
                         </div>
                         <div class="row text-warning">
-                            <div class="col text-end ${currentSelected}">${scaledAmplitudeB.toFixed(2)} A</div>
+                            <div class="col text-end ${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}">${scaledAmplitudeB.toFixed(2)} A</div>
                             <div class="col-1 text-end">&ang;</div>
-                            <div class="col text-end ${phaseSelected}">${synth.phase_b + '°'}</div>
+                            <div class="col text-end ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}">${synth.phase_b + '°'}</div>
                         </div>
                     </div>
                 </button>
