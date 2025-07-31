@@ -29,7 +29,7 @@ def main():
 
     try:
         # Initialize the complete system (hardware only)
-        system = SystemInitializer.initialize_system()
+        system = SystemInitializer.initialize_system(state)
 
         # Extract hardware device objects and info
         encoders = system['encoders']

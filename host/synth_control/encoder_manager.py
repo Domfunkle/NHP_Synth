@@ -152,15 +152,30 @@ class EncoderManager:
                     synth_interface[synth_id].set_frequency(ch, value)
             elif func == 'harmonics':
                 harmonics_channels = ['a', 'b'] if channel == 'all' else [channel]
+
                 for ch in harmonics_channels:
+                    synth_interface[synth_id].clear_harmonics(ch)
+                    
                     harmonics_key = f'harmonics_{ch}'
-                    # Set harmonics from defaults
-                    default_harmonics = defaults[synth_id][harmonics_key]
-                    synth_harmonics = synths[synth_id][harmonics_key]
+                    default_harmonics = defaults[synth_id].get(harmonics_key, [])
+                    synth_harmonics = synths[synth_id].get(harmonics_key, [])
+                    # If synth_harmonics is empty but default_harmonics is not, add missing harmonics
+                    if not synth_harmonics and default_harmonics:
+                        for h in default_harmonics:
+                            synth_harmonics.append({
+                                'id': h.get('id'),
+                                'order': h.get('order', 0),
+                                'amplitude': h.get('amplitude', 0),
+                                'phase': h.get('phase', 0)
+                            })
+                    if not default_harmonics and not synth_harmonics:
+                        continue  # Nothing to set
                     # Set all harmonics in defaults
                     for j, h in enumerate(default_harmonics):
-                        amp = h['amplitude']
-                        order = h['order']
+                        if j >= len(synth_harmonics):
+                            break
+                        amp = h.get('amplitude', 0)
+                        order = h.get('order', 0)
                         phase = h.get('phase', 0)
                         synth_harmonics[j]['amplitude'] = amp
                         synth_harmonics[j]['order'] = order
@@ -171,7 +186,7 @@ class EncoderManager:
                     extra_count = len(synth_harmonics) - len(default_harmonics)
                     for j in range(len(default_harmonics), len(synth_harmonics)):
                         synth_harmonics[j]['amplitude'] = 0
-                        order = synth_harmonics[j]['order']
+                        order = synth_harmonics[j].get('order', 0)
                         phase = synth_harmonics[j].get('phase', 0)
                         value = {'order': order, 'amplitude': 0, 'phase': phase}
                         synth_interface[synth_id].set_harmonics(ch, value)

@@ -15,14 +15,14 @@ class SystemInitializer:
     Handles full system initialization for NHP_Synth.
     """
     @staticmethod
-    def initialize_system():
+    def initialize_system(state_manager):
         # The full code of initialize_system from main.py, with references to globals replaced by arguments.
 
         init_start_time = time.time()
         logger.info("=" * 60)
         logger.info(" NHP_Synth Initialization ".center(60))
         logger.info("=" * 60)
-        logger.info("[Step 1/3] Connecting to I2C rotary encoders...")
+        logger.info("[Step 1/4] Connecting to I2C rotary encoders...")
 
         encoder_configs = [
             {'addr': 0x36, 'name': 'Voltage', 'function': 'voltage'},
@@ -148,14 +148,14 @@ class SystemInitializer:
                     logger.warning(f"  {err}")
             step1_end_time = time.time()
             step1_duration = step1_end_time - init_start_time
-            logger.info(f"[Step 1/3] Done in {step1_duration:.2f}s")
+            logger.info(f"[Step 1/4] Done in {step1_duration:.2f}s")
         except Exception as e:
             logger.error(f"✗ Failed to connect to rotary encoder: {e}")
             logger.warning("Make sure the I2C rotary encoder is connected and powered")
             raise
 
         step2_start_time = time.time()
-        logger.info("[Step 2/3] Connecting to synthesizer...")
+        logger.info("[Step 2/4] Connecting to synthesizer...")
         try:
             device_paths = SynthDiscovery.find_all_synth_devices()
             logger.info(f"Found {len(device_paths)} synthesizer(s)")
@@ -204,11 +204,42 @@ class SystemInitializer:
                 logger.warning("Synthesizer issues:")
                 for err in synth_init_errors:
                     logger.warning(f"  {err}")
+
             step2_end_time = time.time()
             step2_duration = step2_end_time - step2_start_time
-            logger.info(f"[Step 2/3] Done in {step2_duration:.2f}s")
+            logger.info(f"[Step 2/4] Done in {step2_duration:.2f}s")
+
             step3_start_time = time.time()
-            logger.info("[Step 3/3] Initializing control system...")
+            logger.info("[Step 3/4] Syncing synths to state_manager...")
+            for i, synth in enumerate(synths):
+                for ch in ['a', 'b']:
+                    try:
+                        synth.clear_harmonics(ch)
+                    except Exception as e:
+                        logger.warning(f"Synth {i} failed to clear harmonics on channel {ch}: {e}")
+                synth_state = state_manager.synths[i] if i < len(state_manager.synths) else None
+                if synth_state:
+                    try:
+                        synth.set_amplitude('a', synth_state.get('amplitude_a', 0))
+                        synth.set_amplitude('b', synth_state.get('amplitude_b', 0))
+                        synth.set_frequency('a', synth_state.get('frequency_a', 50))
+                        synth.set_frequency('b', synth_state.get('frequency_b', 50))
+                        synth.set_phase('a', synth_state.get('phase_a', 0))
+                        synth.set_phase('b', synth_state.get('phase_b', 0))
+                        for ch in ['a', 'b']:
+                            harmonics_key = f'harmonics_{ch}'
+                            harmonics = synth_state.get(harmonics_key, [])
+                            for h in harmonics:
+                                synth.set_harmonics(ch, h)
+                    except Exception as e:
+                        logger.warning(f"Synth {i} failed to set state: {e}")
+
+            step3_end_time = time.time()
+            step3_duration = step3_end_time - step3_start_time
+            logger.info(f"[Step 3/4] Done in {step3_duration:.2f}s")
+
+            step4_start_time = time.time()
+            logger.info("[Step 4/4] Initializing control system...")
             num_synths = len(synths)
             led_colors = {
                 'voltage': (255, 0, 0),
@@ -223,10 +254,10 @@ class SystemInitializer:
                         pixel.fill(led_colors[func])
                     except:
                         pass
-            step3_end_time = time.time()
-            step3_duration = step3_end_time - step3_start_time
-            total_init_time = step3_end_time - init_start_time
-            logger.info(f"[Step 3/3] Done in {step3_duration:.2f}s")
+            step4_end_time = time.time()
+            step4_duration = step4_end_time - step4_start_time
+            total_init_time = step4_end_time - init_start_time
+            logger.info(f"[Step 4/4] Done in {step4_duration:.2f}s")
             logger.info(f"✓ Initialization complete in {total_init_time:.2f}s.")
             logger.info("-" * 60)
             return {

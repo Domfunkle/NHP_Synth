@@ -127,6 +127,7 @@ export function getGlobalFrequencyHz(AppState) {
 window.selected = { idx: null, channel: null, type: null };
 
 window.setSelected = function(idx, channel, type) {
+    console.log(`setSelected: idx=${idx}, channel=${channel}, type=${type}`);
     window.selected = { idx, channel, type };
     document.querySelectorAll('.selectable').forEach(e => {
         e.classList.remove('selected');
@@ -207,12 +208,16 @@ function harmonicOffCanvas(synth, idx, channel) {
                             </thead>
                             <tbody>
                                 ${[0,1,2,3].map(i => {
-                                    const h = channel === 'a' ? synth.harmonics_a?.[i] : synth.harmonics_b?.[i];
+                                    const harmonics = channel === 'a' ? synth.harmonics_a : synth.harmonics_b;
+                                    let h = null;
+                                    if (Array.isArray(harmonics)) {
+                                        h = harmonics.find(hh => hh.id === i);
+                                    }
                                     const cellStyle = 'style="width:80px;min-width:80px;max-width:80px;"';
                                     return `<tr>
-                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_order_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_order_${i}')">${h?.order ?? '&mdash;'}</td>
-                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_amp_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_amp_${i}')">${h?.amplitude ?? '&mdash;'}</td>
-                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_phase_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_phase_${i}')">${h?.phase ?? '&mdash;'}</td>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_order_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_order_${i}')">${h ? h.order : '&mdash;'}</td>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_amp_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_amp_${i}')">${h ? h.amplitude : '&mdash;'}</td>
+                                        <td class="selectable" ${cellStyle} tabindex="0" id="harmonic_${channel}_phase_${i}_${idx}" onclick="window.setSelected(${idx}, '${channel}', 'harmonic_phase_${i}')">${h ? h.phase : '&mdash;'}</td>
                                     </tr>`;
                                 }).join('')}
                             </tbody>

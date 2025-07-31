@@ -193,7 +193,7 @@
         // --- Socket.IO and Event Logic ---
         const socket = io();
         setSocket(socket);
-        socket.on('synth_state', function (data) {
+        socket.on('synthState', function (data) {
             if (!synthStateEquals(AppState.synthState, data)) {
                 // Assign synthetic id if missing
                 if (data && Array.isArray(data.synths)) {
