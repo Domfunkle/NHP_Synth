@@ -69,40 +69,12 @@ function synthAccordionItem({ synth, idx, phaseLabel }, AppState) {
         if (!mode) return '';
         if (mode.synth === 'all') return '';
         if (mode.synth === synthIdx && (mode.ch === 'all' || mode.ch === channel)) return true;
+        if (mode.synth === synthIdx && channel === 'all') return true;
         return false;
     }
 
     return `
         <div class="accordion-item bg-transparent border-0">
-            <style>
-                .selected {
-                    outline: 2px solid var(--bs-info);
-                    border-radius: 0.375rem;
-                    box-shadow: 0 0 0.5rem var(--bs-info);
-                }
-                .highlighted {
-                    position: relative;
-                    font-weight: bold;
-                    color: inherit;
-                }
-                .highlighted::before {
-                    content: '';
-                    position: absolute;
-                    border: 2px solid var(--bs-info);
-                    border-radius: 0.25em;
-                    pointer-events: none;
-                    box-sizing: border-box;
-                }
-                .highlighted.btn::before {
-                    left: -10px; top: -10px; right: -10px; bottom: -10px;
-                }
-                .highlighted:not(.btn)::before {
-                    left: 30px; top: -5px; right: -5px; bottom: -5px;
-                }
-                #phaseDisplay.highlighted::before {
-                    left: -10px; top: -5px; right: -5px; bottom: -5px;
-                }
-            </style>
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
@@ -124,7 +96,7 @@ function synthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                             <div class="col text-light small">PF ${truePF(synth.phase_a, synth.phase_b, synth.harmonics_b).toFixed(3)}</div>
                         </div>
                         <div class="row text-light">
-                            <div class="col text-light small">THD<sub>i</sub> ${(THD(synth.harmonics_b)).toFixed(3)}</div>
+                            <div class="col text-light small id="THDDisplay">THD<sub>i</sub> ${(THD(synth.harmonics_b)).toFixed(3)}</div>
                         </div>
                     </div>
                 </button>

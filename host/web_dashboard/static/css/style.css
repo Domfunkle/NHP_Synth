@@ -1,0 +1,39 @@
+.selected {
+    outline: 2px solid currentColor;
+    border-radius: 0.375rem;
+    box-shadow: 0 0 0.5rem currentColor;
+}
+
+.highlighted {
+    position: relative;
+    font-weight: bold;
+    color: inherit;
+}
+
+.highlighted::before {
+    content: '';
+    position: absolute;
+    border: 1px solid currentColor;
+    border-radius: 0.25em;
+    pointer-events: none;
+    box-sizing: border-box;
+    box-shadow: 0 0 0.5rem currentColor;
+}
+
+.highlighted.btn::before {
+    border: inherit !important;
+    box-shadow: 0 0 0.5rem var(--bs-btn-color) !important;
+    left: 0px; top: 0px; right: 0px; bottom: 0px;
+}
+
+.highlighted:not(.btn)::before {
+    left: 35px; top: 0px; right: -5px; bottom: -1px;
+}
+
+#phaseDisplay.highlighted::before {
+    left: -10px; top: 0px; right: -5px; bottom: -1px;
+}
+
+#THDDisplay.highlighted::before {
+    left: 41px; top: 0px; right: 5px; bottom: -1px;
+}
