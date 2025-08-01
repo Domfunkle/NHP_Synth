@@ -282,13 +282,17 @@ class EncoderManager:
         phase_key = f'phase_{channel}'
         if mode['synth'] == 'all':
             logger.info(f"[ALL][phase] Rotated {delta} (adjust phase placeholder)")
-            would_exceed = any((self.state.synths[i]['phase_b'] + delta) < -360 or (self.state.synths[i]['phase_b'] + delta) > 360 for i in range(self.state.num_synths))
-            if would_exceed:
-                logger.info("At least one synth would exceed phase bounds, skipping command.")
-                return
+
             for i in range(self.state.num_synths):
                 old_phase = self.state.synths[i]['phase_b']
-                new_phase = round(max(-360, min(360, old_phase + delta)), 2)
+                new_phase = old_phase + delta
+                # Wrap between -180 and +180, rolling over at boundaries
+                if new_phase < -180:
+                    new_phase = 180 + (new_phase + 180)
+                elif new_phase > 180:
+                    new_phase = -180 + (new_phase - 180)
+                # Clamp to -180/+180 if slightly over due to floating point
+                new_phase = round(max(-180, min(180, new_phase)), 2)
                 self.state.synths[i]['phase_b'] = new_phase
                 if old_phase != new_phase:
                     self.synth_interface[i].set_phase('b', new_phase)
@@ -296,8 +300,8 @@ class EncoderManager:
             logger.info(f"[{mode}][phase] Rotated {delta} (adjust phase placeholder)")
             synth_id = mode['synth']
             old_phase = self.state.synths[synth_id][phase_key]
-            new_phase = round(max(-360, min(360, old_phase + delta)), 2)
-            if (old_phase + delta) < -360 or (old_phase + delta) > 360:
+            new_phase = round(max(-180, min(180, old_phase + delta)), 2)
+            if (old_phase + delta) < -180 or (old_phase + delta) > 180:
                 logger.info("Synth would exceed phase bounds, skipping command.")
                 return
             self.state.synths[synth_id][phase_key] = new_phase
