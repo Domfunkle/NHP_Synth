@@ -79,12 +79,24 @@ export async function resetCurrent(idx) {
     }
 }
 
+function wrapClamp(high, low, value) {
+    let v = value;
+    if (value > high) {
+        v = low + (value - high);
+    } else if (value < low) {
+        v = high - (low - value);
+    }
+    if (v > high) v = high;
+    if (v < low) v = low;
+    return v;
+}
+
 export async function incrementPhase(idx, channel, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
         let value = synth[`phase_${channel}`] + delta;
-        value = ((value % 360) + 360) % 360;
+        value = wrapClamp(180, -180, value);
         value = +value.toFixed(2);
         await setSynthPhase(synth.id, channel, value);
     } catch (error) {
@@ -98,7 +110,7 @@ export async function setPhaseDirect(idx, channel, value) {
         const synth = synthState.synths[idx];
         let v = parseFloat(value);
         if (isNaN(v)) return;
-        v = ((v % 360) + 360) % 360;
+        v = wrapClamp(180, -180, v);
         v = +v.toFixed(2);
         await setSynthPhase(synth.id, channel, v);
     } catch (error) {
