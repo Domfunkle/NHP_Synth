@@ -300,10 +300,14 @@ class EncoderManager:
             logger.info(f"[{mode}][phase] Rotated {delta} (adjust phase placeholder)")
             synth_id = mode['synth']
             old_phase = self.state.synths[synth_id][phase_key]
-            new_phase = round(max(-180, min(180, old_phase + delta)), 2)
-            if (old_phase + delta) < -180 or (old_phase + delta) > 180:
-                logger.info("Synth would exceed phase bounds, skipping command.")
-                return
+            new_phase = old_phase + delta
+            # Wrap between -180 and +180, rolling over at boundaries
+            if new_phase < -180:
+                new_phase = 180 + (new_phase + 180)
+            elif new_phase > 180:
+                new_phase = -180 + (new_phase - 180)
+            # Clamp to -180/+180 if slightly over due to floating point
+            new_phase = round(max(-180, min(180, new_phase)), 2)
             self.state.synths[synth_id][phase_key] = new_phase
             if old_phase != new_phase:
                 self.synth_interface[synth_id].set_phase(channel, new_phase)
