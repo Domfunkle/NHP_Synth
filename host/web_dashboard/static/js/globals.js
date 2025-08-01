@@ -1,7 +1,7 @@
 // globals.js - Assigns all needed functions to window for inline event handlers
 
 // Components
-import { SynthCardsRow } from './components/components.js';
+import { SynthCards } from './components/components.js';
 import { synthWaveformChart } from './components/charts.js';
 import { harmonicsCells } from './components/harmonicsCells.js';
 import { incrementButtons } from './components/incrementButtons.js';
@@ -24,16 +24,18 @@ import {
 
 // State Management
 import {
-    AppState, setSynthState, setOpenAccordionId,
-    setOpenOffcanvasId, setSelectedId, getSynthState,
-    getOpenAccordionId, getOpenOffcanvasId, getSelectedId
+    AppState, setSynthState, setOpenOffcanvasId, setSelectedId, getSynthState,
+    getOpenOffcanvasId, getSelectedId
 } from './state.js';
 
 // Utilities
-import { DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner } from './utils.js';
+import {
+    DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner,
+    trueRMS, apparentPower, reactivePower, realPower
+} from './utils.js';
 
 // Components
-window.SynthCardsRow = SynthCardsRow;
+window.SynthCards = SynthCards;
 window.synthWaveformChart = synthWaveformChart;
 window.harmonicsCells = harmonicsCells;
 window.incrementButtons = incrementButtons;
@@ -73,11 +75,9 @@ window.resetHarmonic = resetHarmonic;
 // State Management
 window.AppState = AppState;
 window.setSynthState = setSynthState;
-window.setOpenAccordionId = setOpenAccordionId;
 window.setOpenOffcanvasId = setOpenOffcanvasId;
 window.setSelectedId = setSelectedId;
 window.getSynthState = getSynthState;
-window.getOpenAccordionId = getOpenAccordionId;
 window.getOpenOffcanvasId = getOpenOffcanvasId;
 window.getSelectedId = getSelectedId;
 
@@ -85,5 +85,9 @@ window.getSelectedId = getSelectedId;
 window.DPF = DPF;
 window.THD = THD;
 window.truePF = truePF;
+window.trueRMS = trueRMS;
+window.apparentPower = apparentPower;
+window.reactivePower = reactivePower;
+window.realPower = realPower;
 window.getGlobalFrequencyHz = getGlobalFrequencyHz;
 window.LoadingSpinner = LoadingSpinner;

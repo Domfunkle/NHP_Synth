@@ -3,7 +3,7 @@
 
 function harmonicOffCanvas(synth, idx, channel) {
     return `
-        <div class="offcanvas offcanvas-bottom" data-bs-backdrop="false" style="height:50vh" tabindex="-1" id="harmonics_${channel}_offcanvas_${idx}" aria-labelledby="harmonics_${channel}_offcanvas_${idx}_label">
+        <div class="offcanvas offcanvas-bottom" data-bs-backdrop="false" style="height:70vh" tabindex="-1" id="harmonics_${channel}_offcanvas_${idx}" aria-labelledby="harmonics_${channel}_offcanvas_${idx}_label">
             <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
                 <h5 class="offcanvas-title" id="harmonics_${channel}_offcanvas_${idx}_label">Harmonics (L${idx + 1} - ${channel === 'a' ? 'Voltage' : 'Current'})</h5>
                 <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -50,16 +50,13 @@ document.addEventListener('hidden.bs.offcanvas', function(event) {
     window.clearSelected();
 });
 
-function synthAccordionItem({ synth, idx, phaseLabel }, AppState) {
+function synthCardItem({ synth, idx, phaseLabel }, AppState) {
     const phase = phaseLabel || `L${idx + 1}`;
-    const freqDisplay = (getGlobalFrequencyHz(AppState) !== null) ? `${getGlobalFrequencyHz(AppState)} Hz` : '';
     const chartCanvasId = `waveform_combined_${idx}`;
     const VOLTAGE_RMS_MAX = 240;
     const CURRENT_RMS_MAX = 10;
     const scaledAmplitudeA = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX;
     const scaledAmplitudeB = (synth.amplitude_b / 100) * CURRENT_RMS_MAX;
-    const collapseId = `collapseSynth${idx}`;
-    const headingId = `headingSynth${idx}`;
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
 
     let selectionMode = (AppState.synthState.selectionMode) ? AppState.synthState.selectionMode : {};
@@ -73,140 +70,149 @@ function synthAccordionItem({ synth, idx, phaseLabel }, AppState) {
         return false;
     }
 
-    return `
-        <div class="accordion-item bg-transparent border-0">
-            <h2 class="accordion-header" id="${headingId}">
-                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-                    <div class="col-1 fw-bold">${phase}</div>
-                    <div class="col-auto text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}" id="freqDisplay">${freqDisplay}</div>
-                    <div class="col-5 pe-3">
-                        <div class="row text-info">
-                            <div class="col text-end pe-0 ${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1)} V</div>
-                            <div class="col-1 text-end p-0">&ang;</div>
-                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">${synth.phase_a + '°'}</div>
+    function phaseCard() {
+        return `
+        <div class="row">
+            <div class="col-8">
+                <div class="row h-100" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}">
+                    <div class="col-auto px-1 fw-bold bg-gradient bg-${phase}">
+                        ${phase}
+                    </div>
+                    <div class="col text-start px-0">
+                        <div class="text-${phase}-voltage">
+                            <span style="white-space:pre" class="${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1).padStart(6, ' ')} V</span>
+                            <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_a.toFixed(1).padStart(6, ' ')}°</span>
                         </div>
-                        <div class="row text-warning">
-                            <div class="col text-end pe-0 ${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2)} A</div>
-                            <div class="col-1 text-end p-0">&ang;</div>
-                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">${synth.phase_b + '°'}</div>
+                        <div class="text-${phase}-current">
+                            <span style="white-space:pre" class="${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2).padStart(6, ' ')} A</span>
+                            <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_b.toFixed(1).padStart(6, ' ')}°</span>
+                        </div>
+                        <div>
+                            <span style="white-space:pre">${synth.frequency_a.toFixed(1).padStart(6, ' ')} Hz</span>
                         </div>
                     </div>
-                    <div class="col pe-1 text-end">
-                        <div class="row text-light">
-                            <div class="col text-light small">PF ${truePF(synth.phase_a, synth.phase_b, synth.harmonics_b).toFixed(3)}</div>
+                    <div class="col-auto ">
+                        <div class="row">
+                            <div class="col">cos&phi; ${Math.abs(DPF(synth.phase_a, synth.phase_b)).toFixed(3)}</div>
                         </div>
-                        <div class="row text-light">
-                            <div class="col text-light small id="THDDisplay">THD<sub>i</sub> ${(THD(synth.harmonics_b)).toFixed(3)}</div>
+                        <div class="row">
+                            <div class="col">PF ${Math.abs(truePF(synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3)}</div>
                         </div>
                     </div>
+                    <div class="col-auto px-0">
+                        <div class="row">
+                            <div style="white-space:pre" class="col">${(0.001 * realPower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1, synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kW").padEnd(5,' ')}</div>
+                        </div>
+                        <div class="row">
+                            <div style="white-space:pre" class="col">${(0.001 * apparentPower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1)).toFixed(3) + (" kVA").padEnd(5,' ')}</div>
+                        </div>
+                        <div class="row">
+                            <div class="col">${(0.001 * reactivePower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1, synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kVAr").padEnd(5,' ')}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-2 pe-1">
+                <button class="btn btn-outline-info btn-outline-${phase}-voltage w-100 p-1 ${highlightIfSelected('harmonics', idx, 'a') ? 'highlighted' : ''}" type="button" id="harmonics_a_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_a_offcanvas_${idx}">
+                    <table class="table table-sm table-borderless mb-0 small">
+                        <tbody>
+                            ${harmonicsCells(synth.harmonics_a)}
+                        </tbody>
+                    </table>
                 </button>
-            </h2>
-            <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#synthAccordion">
-                <div class="accordion-body bg-dark py-2">
-                    <div class="row">
-                        <div class="col py-2">
-                            <canvas id="${chartCanvasId}" width="340" height="80" style="display:block;margin:auto;cursor:pointer;" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}"></canvas>
+            </div>
+            <div class="col-2 ps-1">
+                <button class="btn btn-outline-info btn-outline-${phase}-current w-100 p-1 ${highlightIfSelected('harmonics', idx, 'b') ? 'highlighted' : ''}" type="button" id="harmonics_b_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_b_offcanvas_${idx}">
+                    <table class="table table-sm table-borderless mb-0 small">
+                        <tbody>
+                            ${harmonicsCells(synth.harmonics_b)}
+                        </tbody>
+                    </table>
+                </button>
+            </div>
+        </div>
+        `;
+    }
+
+    return `
+        <div class="card-header py-1"></div>
+        <div class="card-body bg-dark py-1 font-monospace">
+            ${phaseCard()}
+            <!-- Offcanvas for Waveform -->
+            <div class="offcanvas offcanvas-bottom" style="height:91vh" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('waveform')}" aria-labelledby="${offcanvasId('waveform')}_label">
+                <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
+                    <h5 class="offcanvas-title py-1 fs-5" id="${offcanvasId('waveform')}_label">Set Waveform (L${idx + 1})</h5>
+                    <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body pt-0 p-2" style="overflow-y:hidden; overflow-x:hidden;">
+                    <div class="row m-1 pb-2">
+                        <div class="card p-3 bg-dark font-monospace">
+                            ${phaseCard()}
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-6 pe-1">
-                            <button class="btn btn-outline-info w-100 ${highlightIfSelected('harmonics', idx, 'a') ? 'highlighted' : ''}" type="button" id="harmonics_a_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_a_offcanvas_${idx}">
-                                <table class="table table-sm table-borderless mb-0">
-                                    <tbody>
-                                        ${harmonicsCells(synth.harmonics_a)}
-                                    </tbody>
-                                </table>
-                            </button>
+                    <div class="row justify-content-center px-2">
+                        
+                        <div class="col-auto">
+                            <canvas id="${chartCanvasId}" width="330" height="80" style="display:block;margin:auto;cursor:pointer;"></canvas>
                         </div>
-                        <div class="col-6 ps-1}">
-                            <button class="btn btn-outline-warning w-100 ${highlightIfSelected('harmonics', idx, 'b') ? 'highlighted' : ''}" type="button" id="harmonics_b_btn_${idx}" data-bs-toggle="offcanvas" data-bs-target="#harmonics_b_offcanvas_${idx}">
-                                <table class="table table-sm table-borderless mb-0">
-                                    <tbody>
-                                        ${harmonicsCells(synth.harmonics_b)}
-                                    </tbody>
-                                </table>
-                            </button>
+
+                        <div class="col-auto">
+                            <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="voltage_group_${idx}" onclick="setSelected(${idx}, 'a', 'voltage')">
+                                <div class="input-group-text fs-5 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">V</div>
+                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="setVoltageDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setVoltageDirect(${idx}, event.target.value)}">
+                                <div class="input-group-text text-muted" style="min-width:120px">0 - 240 V<sub>rms</sub></div>
+                            </div>
+
+                            <div class="input-group mb-2 justify-content-center selectable ${phase}-current" tabindex="0" id="current_group_${idx}" onclick="setSelected(${idx}, 'b', 'current')">
+                                <div class="input-group-text fs-5 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">I</div>
+                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="setCurrentDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setCurrentDirect(${idx}, event.target.value)}">
+                                <div class="input-group-text text-muted" style="min-width:120px">0 - 10 A<sub>rms</sub></div>
+                            </div>
+
+                            <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="phase_a_group_${idx}" onclick="setSelected(${idx}, 'a', 'phase')">
+                                <div class="input-group-text fs-5 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
+                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'a', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'a', event.target.value)}">
+                                <div class="input-group-text text-muted" style="min-width:120px">&plusmn; 180°</div>
+                            </div>
+                            <div class="input-group mb-2 justify-content-center selectable ${phase}-current" tabindex="0" id="phase_b_group_${idx}" onclick="setSelected(${idx}, 'b', 'phase')">
+                                <div class="input-group-text fs-5 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
+                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'b', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'b', event.target.value)}">
+                                <div class="input-group-text text-muted" style="min-width:120px">&plusmn; 180°</div>
+                            </div>
+
+                            <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="frequency_group_${idx}" onclick="setSelected(${idx}, 'a', 'frequency')">
+                                <div class="input-group-text fs-5 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">f</div>
+                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="setFrequencyDirect(event.target.value)" onkeydown="if(event.key==='Enter'){setFrequencyDirect(event.target.value)}">
+                                <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
+                            </div>
                         </div>
-                    </div>
-                    <!-- Offcanvas for Waveform -->
-                    <div class="offcanvas offcanvas-bottom" style="height:45vh" data-bs-backdrop="false" tabindex="-1" id="${offcanvasId('waveform')}" aria-labelledby="${offcanvasId('waveform')}_label">
-                        <div class="offcanvas-header py-1" style="min-height:32px;max-height:38px;">
-                            <h5 class="offcanvas-title py-1 fs-6" id="${offcanvasId('waveform')}_label">Set Waveform (L${idx + 1})</h5>
-                            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-                        </div>
-                        <div class="offcanvas-body p-2" style="overflow-y:hidden; overflow-x:hidden;">
-                            <div class="row justify-content-center px-2">
-                                <div class="col-auto">
-                                    <div class="row">
-                                        <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="voltage_group_${idx}" onclick="setSelected(${idx}, 'a', 'voltage')">
-                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">V</div>
-                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="setVoltageDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setVoltageDirect(${idx}, event.target.value)}">
-                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 240 V<sub>rms</sub></div>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="current_group_${idx}" onclick="setSelected(${idx}, 'b', 'current')">
-                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family:Cambria;">I</div>
-                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="setCurrentDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setCurrentDirect(${idx}, event.target.value)}">
-                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 10 A<sub>rms</sub></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="phase_a_group_${idx}" onclick="setSelected(${idx}, 'a', 'phase')">
-                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
-                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'a', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'a', event.target.value)}">
-                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
-                                            </div>
-                                        </div>
-                                        <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="phase_b_group_${idx}" onclick="setSelected(${idx}, 'b', 'phase')">
-                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
-                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'b', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'b', event.target.value)}">
-                                                <div class="input-group-text text-muted" style="min-width:120px">0 - 360 °</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="row justify-content-center">
-                                        <div class="col-6">
-                                            <div class="input-group mb-2 justify-content-center selectable" tabindex="0" id="frequency_group_${idx}" onclick="setSelected(${idx}, 'a', 'frequency')">
-                                                <div class="input-group-text fs-4 justify-content-center" style="min-width:68px; font-style:italic; font-family: Cambria;">f</div>
-                                                <input type="text" class="form-control text-center fs-5" style="width:90px;max-width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="setFrequencyDirect(event.target.value)" onkeydown="if(event.key==='Enter'){setFrequencyDirect(event.target.value)}">
-                                                <div class="input-group-text text-muted" style="min-width:120px">20 - 70 Hz</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col">
-                                    <div class="row">
-                                        <div class="col" id="increment_buttons_${idx}">
-                                            ${incrementButtons()}
-                                        </div>
-                                    </div>
+                        <div class="col-2">
+                            <div class="row">
+                                <div class="col" id="increment_buttons_${idx}">
+                                    ${incrementButtons()}
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <!-- Offcanvas for Harmonics -->
-                    ${harmonicOffCanvas(synth, idx, 'a')}
-                    ${harmonicOffCanvas(synth, idx, 'b')}
                 </div>
             </div>
+            <!-- Offcanvas for Harmonics -->
+            ${harmonicOffCanvas(synth, idx, 'a')}
+            ${harmonicOffCanvas(synth, idx, 'b')}
         </div>
     `;
 }
 
-export function SynthCardsRow(AppState) {
+export function SynthCards(AppState) {
     const { synths } = AppState.synthState
     if (!synths || synths.length === 0) {
         return `<div class="col"><div class="alert alert-info">No synths available.</div></div>`;
     }
     const phaseLabels = ['L1', 'L2', 'L3'];
     return `
-    <div class="accordion" id="synthAccordion">
-        ${synths.map((synth, idx) => synthAccordionItem({ synth, idx, phaseLabel: phaseLabels[idx] }, AppState)).join('')}
+    <div class="card" id="synthCard">
+        ${synths.map((synth, idx) => synthCardItem({ synth, idx, phaseLabel: phaseLabels[idx] }, AppState)).join('')}
     </div>
 `;
 }

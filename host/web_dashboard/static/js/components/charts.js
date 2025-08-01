@@ -29,6 +29,12 @@ export function synthWaveformChart(synth, canvasId) {
     const yB = x.map(t => sumHarmonics(t, peakAmplitudeB, phaseB, synth.harmonics_b));
     const voltageMax = sqrt2 * VOLTAGE_RMS_MAX * 1.1;
     const currentMax = sqrt2 * CURRENT_RMS_MAX * 1.1;
+
+    const phase = 'L' + (synth.id + 1);
+    const rootStyles = getComputedStyle(document.documentElement);
+    const phaseColorA = rootStyles.getPropertyValue(`--${phase}-voltage-color`);
+    const phaseColorB = rootStyles.getPropertyValue(`--${phase}-current-color`);
+
     const ctx = document.getElementById(canvasId)?.getContext('2d');
     if (!ctx) return;
     if (window[canvasId + '_chart']) {
@@ -42,7 +48,7 @@ export function synthWaveformChart(synth, canvasId) {
                 {
                     label: 'Voltage',
                     data: yA,
-                    borderColor: '#0dcaf0',
+                    borderColor: phaseColorA,
                     borderWidth: 2,
                     pointRadius: 0,
                     fill: false,
@@ -53,7 +59,7 @@ export function synthWaveformChart(synth, canvasId) {
                 {
                     label: 'Current',
                     data: yB,
-                    borderColor: '#ffc107',
+                    borderColor: phaseColorB,
                     borderWidth: 2,
                     pointRadius: 0,
                     fill: false,

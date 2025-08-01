@@ -17,25 +17,12 @@
     <script type="module" src="static/js/globals.js"></script>
     <script type="module">
 
-        // --- Accordion & Offcanvas State Persistence ---
-        setOpenAccordionId(null);
+        // --- Offcanvas State Persistence ---
         setOpenOffcanvasId(null);
         setSelectedId(null);
 
-        // Listen for accordion and offcanvas open/close events
+        // Listen for offcanvas open/close events
         function setupStateListeners() {
-            const accordion = document.getElementById('synthAccordion');
-            accordion.querySelectorAll('.accordion-collapse').forEach(collapse => {
-                collapse.addEventListener('show.bs.collapse', function () {
-                    setOpenAccordionId(this.id);
-                });
-                collapse.addEventListener('hide.bs.collapse', function () {
-                    if (getOpenAccordionId() === this.id) {
-                        setOpenAccordionId(null);
-                    }
-                });
-            });
-
             // Offcanvas listeners
             document.querySelectorAll('.offcanvas').forEach(offcanvas => {
                 offcanvas.addEventListener('show.bs.offcanvas', function () {
@@ -71,32 +58,15 @@
         // --- Render Logic ---
         function render() {
             // Synth cards
-            const cardsRow = document.getElementById('synth-cards-row');
-            if (cardsRow) {
+            const cardsContainer = document.getElementById('synth-cards');
+            if (cardsContainer) {
                 if (AppState.synthState && AppState.synthState.synths) {
-                    cardsRow.innerHTML = SynthCardsRow(AppState);
+                    cardsContainer.innerHTML = SynthCards(AppState);
                     // After DOM update, render combined waveforms for each synth
                     AppState.synthState.synths.forEach((synth, idx) => {
                         synthWaveformChart(synth, `waveform_combined_${idx}`);
                     });
                     console.log(AppState);
-
-                    // Restore open accordion if any, but only disable animation for this restoration
-                    if (AppState.openAccordionId) {
-                        const openElem = document.getElementById(AppState.openAccordionId);
-                        if (openElem && !openElem.classList.contains('show')) {
-                            // Temporarily disable transition for this element
-                            const prevTransition = openElem.style.transition;
-                            openElem.style.transition = 'none';
-                            openElem.classList.add('show');
-                            // Force reflow to apply the class immediately
-                            void openElem.offsetWidth;
-                            // Restore transition after a short delay
-                            setTimeout(() => {
-                                openElem.style.transition = prevTransition;
-                            }, 10);
-                        }
-                    }
 
                     // Restore selected input group if any
                     if (AppState.selectedId) {
@@ -127,7 +97,7 @@
 
                     setupStateListeners();
                 } else {
-                    cardsRow.innerHTML = LoadingSpinner();
+                    cardsContainer.innerHTML = LoadingSpinner();
                 }
             }
         }
@@ -212,25 +182,9 @@
                     </button>
                 </div>
             </div>
-            <!-- Left panel: synth cards -->
-            <div class="row h-100">
-                <div class="col-6 h-100 pe-1">
-
-                    <div class="row flex-nowrap overflow-auto h-100" id="synth-cards-row" style="min-height:340px;">
-                        <!-- Synth cards will be dynamically inserted here -->
-                    </div>
-                </div>
-                <!-- Right panel: blank for now -->
-                <div class="col-6 h-100 ps-1">
-                    <div class="card rounded">
-                        <div class="card-header bg-dark text-light text-center py-2">
-                            <strong>Right Panel</strong>
-                        </div>
-                        <div class="card-body d-flex flex-column justify-content-center align-items-center">
-                            <p class="text-muted">This panel is reserved for future content.</p>
-                        </div>
-                    </div>
-                    <!-- Placeholder for future content -->
+            <div class="row">
+                <div class="col-12" id="synth-cards">
+                    <!-- Synth cards will be dynamically inserted here -->
                 </div>
             </div>
         </div>
