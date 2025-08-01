@@ -97,23 +97,26 @@ function synthAccordionItem({ synth, idx, phaseLabel }, AppState) {
                     left: -10px; top: -10px; right: -10px; bottom: -10px;
                 }
                 .highlighted:not(.btn)::before {
-                    left: 10px; top: -5px; right: -5px; bottom: -5px;
+                    left: 30px; top: -5px; right: -5px; bottom: -5px;
+                }
+                #phaseDisplay.highlighted::before {
+                    left: -10px; top: -5px; right: -5px; bottom: -5px;
                 }
             </style>
             <h2 class="accordion-header" id="${headingId}">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
                     <div class="col-1 fw-bold">${phase}</div>
-                    <div class="col-auto text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}">${freqDisplay}</div>
+                    <div class="col-auto text-end ${highlightIfSelected('frequency', idx, 'all') ? 'highlighted' : ''}" id="freqDisplay">${freqDisplay}</div>
                     <div class="col-5 pe-3">
                         <div class="row text-info">
-                            <div class="col text-end pe-0 ${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}">${scaledAmplitudeA.toFixed(1)} V</div>
+                            <div class="col text-end pe-0 ${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1)} V</div>
                             <div class="col-1 text-end p-0">&ang;</div>
-                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}">${synth.phase_a + '°'}</div>
+                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">${synth.phase_a + '°'}</div>
                         </div>
                         <div class="row text-warning">
-                            <div class="col text-end pe-0 ${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}">${scaledAmplitudeB.toFixed(2)} A</div>
+                            <div class="col text-end pe-0 ${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2)} A</div>
                             <div class="col-1 text-end p-0">&ang;</div>
-                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}">${synth.phase_b + '°'}</div>
+                            <div class="col-3 text-start ps-1 ${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">${synth.phase_b + '°'}</div>
                         </div>
                     </div>
                     <div class="col pe-1 text-end">
