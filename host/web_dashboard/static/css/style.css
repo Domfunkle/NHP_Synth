@@ -1,3 +1,17 @@
+:root {
+    --L1-voltage-color: hsl(0, 100%, 90%);
+    --L1-current-color: hsl(0, 100%, 60%);
+
+    /* --L2-voltage-color: hsl(0, 0%, 80%); */
+    /* --L2-current-color: hsl(0, 0%, 60%); */
+
+    --L2-voltage-color: hsl(60, 100%, 90%);
+    --L2-current-color: hsl(60, 100%, 60%);
+
+    --L3-voltage-color: hsl(220, 100%, 90%);
+    --L3-current-color: hsl(220, 100%, 60%);
+}
+
 .selected {
     outline: 2px solid currentColor;
     border-radius: 0.375rem;
@@ -55,26 +69,8 @@
     left: -2px; top: -1px; right: -5px; bottom: -1px;
 }
 
-/* #phaseDisplay.highlighted::before {
-    left: -10px; top: 0px; right: -5px; bottom: -1px;
-} */
-
 #THDDisplay.highlighted::before {
     left: 41px; top: 0px; right: 5px; bottom: -1px;
-}
-
-:root {
-    --L1-voltage-color: hsl(0, 100%, 90%);
-    --L1-current-color: hsl(0, 100%, 60%);
-
-    /* --L2-voltage-color: hsl(0, 0%, 80%); */
-    /* --L2-current-color: hsl(0, 0%, 60%); */
-
-    --L2-voltage-color: hsl(60, 100%, 90%);
-    --L2-current-color: hsl(60, 100%, 60%);
-
-    --L3-voltage-color: hsl(220, 100%, 90%);
-    --L3-current-color: hsl(220, 100%, 60%);
 }
 
 .text-L1-voltage {
@@ -165,4 +161,23 @@
     --bs-btn-active-border-color: var(--L3-current-color);
     --bs-btn-disabled-color: var(--L3-current-color);
     --bs-btn-disabled-border-color: var(--L3-current-color);
+}
+
+.border-L1-voltage {
+    border: 1px solid var(--L1-voltage-color);
+}
+.border-L1-current {
+    border: 1px solid var(--L1-current-color);
+}
+.border-L2-voltage {
+    border: 1px solid var(--L2-voltage-color);
+}
+.border-L2-current {
+    border: 1px solid var(--L2-current-color);
+}
+.border-L3-voltage {
+    border: 1px solid var(--L3-voltage-color);
+}
+.border-L3-current {
+    border: 1px solid var(--L3-current-color);
 }
