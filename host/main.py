@@ -6,7 +6,6 @@ I2C rotary encoder amplitude control interface for the ESP32 DDS synthesizer.
 """
 
 import os
-import json
 import time
 import threading
 import multiprocessing
@@ -41,14 +40,6 @@ def main():
 
         # State management: load the state and assign synths
         state.num_synths = num_synths
-        loaded_state = state.load_state()
-        if loaded_state and isinstance(loaded_state.get('synths'), list):
-            state.synths = loaded_state['synths']
-            logger.info(f"Loaded synth state from {STATE_FILE}")
-        else:
-            state.synths = state.defaults[:num_synths]
-            state.save_state()
-            logger.info(f"Initialized synth state from defaults")
 
         # Wrap hardware encoders and pixels in Encoder objects
         encoder_objs = {

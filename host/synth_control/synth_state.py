@@ -8,10 +8,13 @@ class SynthStateManager:
     def __init__(self, state_file, defaults_file):
         self.state_file = state_file
         self.defaults_file = defaults_file
-        self.defaults = self.load_defaults()  # Load defaults from file or use hardcoded defaults
+        self.defaults = []
+        self.synths = {}
         self.num_synths = 0
-        self.synths = copy.deepcopy(self.defaults)  # List of synth dicts, one per synth
         self.selection_mode = None
+
+        self.defaults = copy.deepcopy(self.load_defaults())
+        self.synths = copy.deepcopy(self.load_state()).get("synths", [])
 
     def get_defaults(self, idx, key):
         if idx < len(self.defaults):
@@ -33,9 +36,9 @@ class SynthStateManager:
 
     def load_defaults(self):
         """Load defaults from the defaults JSON file, or use hardcoded defaults if file does not exist."""
-        default_data = {}
+        default_data = []
         for i in range(3):
-            default_data.setdefault("synths", []).append({
+            default_data.append({
                 "amplitude_a": 96.0,
                 "amplitude_b": 50.0,
                 "frequency_a": 50.0,
@@ -52,20 +55,17 @@ class SynthStateManager:
             })
 
         if not os.path.exists(self.defaults_file):
-            self.defaults = default_data["synths"]
+            self.defaults = default_data
             return self._return_defaults()
         try:
             with open(self.defaults_file, 'r') as f:
                 data = json.load(f)
-            # If file exists but is missing 'synths', use hardcoded
-            if not isinstance(data, dict) or "synths" not in data:
-                self.defaults = default_data["synths"]
-                return self._return_defaults()
-            self.defaults = copy.deepcopy(data["synths"])
+
+            self.defaults = copy.deepcopy(data)
             return self.defaults
         except Exception as e:
             logger.warning(f"Could not load defaults: {e}")
-            self.defaults = default_data["synths"]
+            self.defaults = default_data
             return self._return_defaults()
 
     def save_state(self):
@@ -79,14 +79,18 @@ class SynthStateManager:
     def load_state(self):
         """Load synth/channel values from JSON file, update internal state, and return the state dict."""
         if not os.path.exists(self.state_file):
-            return None
+            self.num_synths = len(self.defaults)
+            self.synths = copy.deepcopy(self.defaults)
+            self.save_state()
+            return copy.deepcopy(self.defaults)
         try:
             with open(self.state_file, 'r') as f:
                 state = json.load(f)
             if 'num_synths' not in state or 'synths' not in state:
-                return None
-            self.num_synths = state['num_synths']
-            self.synths = state['synths']
+                return copy.deepcopy(self.defaults)
+            self.num_synths = state.get('num_synths', len(self.defaults))
+            self.synths = state.get('synths', copy.deepcopy(self.defaults))
+            self.num_synths = len(self.synths)
             # Ensure harmonics lists are lists
             for synth in self.synths:
                 for key in ['harmonics_a', 'harmonics_b']:
@@ -95,4 +99,4 @@ class SynthStateManager:
             return state
         except Exception as e:
             logger.warning(f"Could not load synth state: {e}")
-            return None
+            return copy.deepcopy(self.defaults)
