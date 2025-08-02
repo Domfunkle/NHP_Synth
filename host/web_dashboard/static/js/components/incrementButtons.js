@@ -14,6 +14,8 @@ export function incrementButtons() {
         levels = [45, 30, 5, 1, 0.1];
     } else if (type === 'current') {
         levels = [1, 0.1, 0.01];
+    } else if (type === 'voltage') {
+        levels = [10, 1, 0.1];
     }
 
     const adjustment = levels[window.incrementAdjustmentIndex];
@@ -26,7 +28,7 @@ export function incrementButtons() {
     };
 
     return `
-        <div class="d-flex flex-column gap-2">
+        <div class="vstack gap-2">
             <button class="btn btn-outline-info p-2 btn-lg" type="button"
                 onclick="incrementSelected(${adjustment})">
                 <span class="bi bi-arrow-up"></span>

@@ -9,10 +9,8 @@ document.addEventListener('hidden.bs.offcanvas', function(event) {
 function synthCardItem({ synth, idx, phaseLabel }, AppState) {
     const phase = phaseLabel || `L${idx + 1}`;
     const chartCanvasId = `waveform_combined_${idx}`;
-    const VOLTAGE_RMS_MAX = 240;
-    const CURRENT_RMS_MAX = 10;
-    const scaledAmplitudeA = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX;
-    const scaledAmplitudeB = (synth.amplitude_b / 100) * CURRENT_RMS_MAX;
+    const scaledAmplitudeA = roundToPrecision((synth.amplitude_a / 100) * VOLTAGE_RMS_MAX, 1);
+    const scaledAmplitudeB = roundToPrecision((synth.amplitude_b / 100) * CURRENT_RMS_MAX, 2);
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
 
     let selectionMode = (AppState.synthState.selectionMode) ? AppState.synthState.selectionMode : {};
@@ -28,9 +26,9 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
 
     function phaseCard() {
         return `
-        <div class="row">
+        <div class="row" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}">
             <div class="col-7">
-                <div class="row h-100" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}">
+                <div class="row h-100">
                     <div class="col-auto px-1 fw-bold bg-gradient bg-${phase}">
                         ${phase}
                     </div>
@@ -114,41 +112,39 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                         </div>
                     </div>
 
-                    <div class="col-auto px-1">
-                        <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="voltage_group_${idx}" onclick="setSelected(${idx}, 'a', 'voltage')">
+                    <div class="col-auto vstack gap-2 px-1">
+                        <div class="input-group justify-content-center selectable ${phase}-voltage" tabindex="0" id="voltage_group_${idx}" onclick="setSelected(${idx}, 'a', 'voltage')">
                             <div class="input-group-text fs-5 justify-content-center" style="width:68px; font-style:italic; font-family:Cambria;">V</div>
-                            <input type="text" class="form-control text-center fs-5" style="width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="setVoltageDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setVoltageDirect(${idx}, event.target.value)}">
+                            <input type="text" class="form-control text-end fs-5" style="width:90px;" id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" onblur="setVoltageDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setVoltageDirect(${idx}, event.target.value)}">
                             <div class="input-group-text text-muted" style="width:100px">0&hellip;240 V<sub>rms</sub></div>
                         </div>
 
-                        <div class="input-group mb-2 justify-content-center selectable ${phase}-current" tabindex="0" id="current_group_${idx}" onclick="setSelected(${idx}, 'b', 'current')">
+                        <div class="input-group justify-content-center selectable ${phase}-current" tabindex="0" id="current_group_${idx}" onclick="setSelected(${idx}, 'b', 'current')">
                             <div class="input-group-text fs-5 justify-content-center" style="width:68px; font-style:italic; font-family:Cambria;">I</div>
-                            <input type="text" class="form-control text-center fs-5" style="width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="setCurrentDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setCurrentDirect(${idx}, event.target.value)}">
+                            <input type="text" class="form-control text-end fs-5" style="width:90px;" id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" onblur="setCurrentDirect(${idx}, event.target.value)" onkeydown="if(event.key==='Enter'){setCurrentDirect(${idx}, event.target.value)}">
                             <div class="input-group-text text-muted" style="width:100px">0&hellip;10 A<sub>rms</sub></div>
                         </div>
 
-                        <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="phase_a_group_${idx}" onclick="setSelected(${idx}, 'a', 'phase')">
+                        <div class="input-group justify-content-center selectable ${phase}-voltage" tabindex="0" id="phase_a_group_${idx}" onclick="setSelected(${idx}, 'a', 'phase')">
                             <div class="input-group-text fs-5 justify-content-center" style="width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
-                            <input type="text" class="form-control text-center fs-5" style="width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'a', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'a', event.target.value)}">
+                            <input type="text" class="form-control text-end fs-5" style="width:90px;" id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'a', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'a', event.target.value)}">
                             <div class="input-group-text text-muted" style="width:100px">&plusmn; 180°</div>
                         </div>
-                        <div class="input-group mb-2 justify-content-center selectable ${phase}-current" tabindex="0" id="phase_b_group_${idx}" onclick="setSelected(${idx}, 'b', 'phase')">
+                        <div class="input-group justify-content-center selectable ${phase}-current" tabindex="0" id="phase_b_group_${idx}" onclick="setSelected(${idx}, 'b', 'phase')">
                             <div class="input-group-text fs-5 justify-content-center" style="width:68px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
-                            <input type="text" class="form-control text-center fs-5" style="width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'b', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'b', event.target.value)}">
+                            <input type="text" class="form-control text-end fs-5" style="width:90px;" id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" onblur="setPhaseDirect(${idx}, 'b', event.target.value)" onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'b', event.target.value)}">
                             <div class="input-group-text text-muted" style="width:100px">&plusmn; 180°</div>
                         </div>
 
-                        <div class="input-group mb-2 justify-content-center selectable ${phase}-voltage" tabindex="0" id="frequency_group_${idx}" onclick="setSelected(${idx}, 'a', 'frequency')">
+                        <div class="input-group justify-content-center selectable ${phase}-voltage" tabindex="0" id="frequency_group_${idx}" onclick="setSelected(${idx}, 'a', 'frequency')">
                             <div class="input-group-text fs-5 justify-content-center" style="width:68px; font-style:italic; font-family: Cambria;">f</div>
-                            <input type="text" class="form-control text-center fs-5" style="width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="setFrequencyDirect(event.target.value)" onkeydown="if(event.key==='Enter'){setFrequencyDirect(event.target.value)}">
+                            <input type="text" class="form-control text-end fs-5" style="width:90px;" id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" onblur="setFrequencyDirect(event.target.value)" onkeydown="if(event.key==='Enter'){setFrequencyDirect(event.target.value)}">
                             <div class="input-group-text text-muted" style="width:100px">20&hellip;70 Hz</div>
                         </div>
                     </div>
                     <div class="col-2">
-                        <div class="row">
-                            <div class="col" id="increment_buttons_${idx}">
-                                ${incrementButtons()}
-                            </div>
+                        <div class="row" id="increment_buttons_${idx}">
+                            ${incrementButtons()}
                         </div>
                     </div>
                 </div>

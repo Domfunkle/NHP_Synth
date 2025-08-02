@@ -60,3 +60,12 @@ export function getGlobalFrequencyHz(AppState) {
 export function LoadingSpinner() {
     return '<div class="col"><div class="alert alert-info">Waiting for data...</div></div>';
 }
+
+export function roundToPrecision(value, precision) {
+    if (typeof value !== 'number' || isNaN(value)) return 0;
+    const factor = Math.pow(10, precision);
+    return Math.round(value * factor) / factor;
+}
+
+export const VOLTAGE_RMS_MAX = 250;
+export const CURRENT_RMS_MAX = 10;

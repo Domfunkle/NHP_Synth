@@ -36,7 +36,7 @@ class SynthStateManager:
         default_data = {}
         for i in range(3):
             default_data.setdefault("synths", []).append({
-                "amplitude_a": 100.0,
+                "amplitude_a": 96.0,
                 "amplitude_b": 50.0,
                 "frequency_a": 50.0,
                 "frequency_b": 50.0,

@@ -5,10 +5,9 @@ export async function incrementVoltage(idx, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        const VOLTAGE_RMS_MAX = 240;
         let value = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX + delta;
         value = Math.max(0, Math.min(VOLTAGE_RMS_MAX, value));
-        const percent = +(value / VOLTAGE_RMS_MAX * 100).toFixed(2);
+        const percent = roundToPrecision(value / VOLTAGE_RMS_MAX * 100, 2);
         await setSynthAmplitude(synth.id, 'a', percent);
     } catch (error) {
         console.error('incrementVoltage: error incrementing voltage', error);
@@ -19,11 +18,10 @@ export async function setVoltageDirect(idx, value) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        const VOLTAGE_RMS_MAX = 240;
         let v = parseFloat(value);
         if (isNaN(v)) return;
         v = Math.max(0, Math.min(VOLTAGE_RMS_MAX, v));
-        const percent = +(v / VOLTAGE_RMS_MAX * 100).toFixed(2);
+        const percent = roundToPrecision(v / VOLTAGE_RMS_MAX * 100, 2);
         await setSynthAmplitude(synth.id, 'a', percent);
     } catch (error) {
         console.error('setVoltageDirect: error setting voltage', error);
@@ -44,7 +42,6 @@ export async function incrementCurrent(idx, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        const CURRENT_RMS_MAX = 10;
         let value = (synth.amplitude_b / 100) * CURRENT_RMS_MAX + delta;
         value = Math.max(0, Math.min(CURRENT_RMS_MAX, value));
         const percent = +(value / CURRENT_RMS_MAX * 100).toFixed(2);
@@ -58,7 +55,6 @@ export async function setCurrentDirect(idx, value) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        const CURRENT_RMS_MAX = 10;
         let v = parseFloat(value);
         if (isNaN(v)) return;
         v = Math.max(0, Math.min(CURRENT_RMS_MAX, v));
@@ -136,7 +132,7 @@ export async function incrementFrequency(delta) {
         for (const synth of synthState.synths) {
             if (!synth || typeof synth.id === 'undefined') continue;
             for (const channel of ['a', 'b']) {
-                let value = synth[`frequency_${channel}`] + delta * 1;
+                let value = synth[`frequency_${channel}`] + delta;
                 value = Math.max(FREQ_MIN, Math.min(FREQ_MAX, value));
                 value = +value.toFixed(2);
                 await setSynthFrequency(synth.id, channel, value);
@@ -196,13 +192,13 @@ export async function incrementHarmonic(idx, channel, id, delta, property) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        const harmonic = synth[`harmonics_${channel}`]?.findIndex(h => h.id == id);
-
+        const harmonic = synth[`harmonics_${channel}`]?.find(h => h.id == id);
+        
         const value = {
             id,
-            order: harmonic.order ?? 1,
-            amplitude: harmonic.amplitude ?? 0,
-            phase: harmonic.phase ?? 0
+            order: harmonic?.order ?? 1,
+            amplitude: harmonic?.amplitude ?? 0,
+            phase: harmonic?.phase ?? 0
         }
 
         if (property === 'order') {

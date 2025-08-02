@@ -5,8 +5,6 @@ export function synthWaveformChart(synth, canvasId) {
     const amplitudeA = synth.amplitude_a, frequencyA = synth.frequency_a, phaseA = synth.phase_a;
     const amplitudeB = synth.amplitude_b, frequencyB = synth.frequency_b, phaseB = synth.phase_b;
     if ([amplitudeA, frequencyA, phaseA, amplitudeB, frequencyB, phaseB].some(v => v === undefined)) return;
-    const VOLTAGE_RMS_MAX = 240;
-    const CURRENT_RMS_MAX = 10;
     const scaledAmplitudeA = (amplitudeA / 100) * VOLTAGE_RMS_MAX;
     const scaledAmplitudeB = (amplitudeB / 100) * CURRENT_RMS_MAX;
     const sqrt2 = Math.sqrt(2);

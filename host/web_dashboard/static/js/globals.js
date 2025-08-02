@@ -31,7 +31,8 @@ import {
 // Utilities
 import {
     DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner,
-    trueRMS, apparentPower, reactivePower, realPower
+    trueRMS, apparentPower, reactivePower, realPower, roundToPrecision,
+    VOLTAGE_RMS_MAX, CURRENT_RMS_MAX
 } from './utils.js';
 
 // Components
@@ -91,3 +92,6 @@ window.reactivePower = reactivePower;
 window.realPower = realPower;
 window.getGlobalFrequencyHz = getGlobalFrequencyHz;
 window.LoadingSpinner = LoadingSpinner;
+window.roundToPrecision = roundToPrecision;
+window.VOLTAGE_RMS_MAX = VOLTAGE_RMS_MAX;
+window.CURRENT_RMS_MAX = CURRENT_RMS_MAX;
