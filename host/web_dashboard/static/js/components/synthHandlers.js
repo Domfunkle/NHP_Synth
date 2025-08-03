@@ -196,10 +196,10 @@ export async function incrementHarmonic(idx, channel, id, delta, property) {
         
         const value = {
             id,
-            order: harmonic?.order ?? 1,
+            order: property === 'order' ? (harmonic?.order ?? 1) : (harmonic?.order ?? 3),
             amplitude: harmonic?.amplitude ?? 0,
             phase: harmonic?.phase ?? 0
-        }
+        };
 
         if (property === 'order') {
             const maxOrder = 127;
@@ -232,8 +232,15 @@ export async function resetHarmonic(idx, channel, id, property) {
 
         const { defaults } = await getDefaults();
         const synthDefaults = defaults?.[idx];
-        const defaultHarmonic = synthDefaults?.[`harmonics_${channel}`]?.find(h => h.id === id);
-
+        let defaultHarmonic = synthDefaults?.[`harmonics_${channel}`]?.find(h => h.id === id);
+        if (!defaultHarmonic) {
+            defaultHarmonic = {
+                id,
+                order: 0,
+                amplitude: 0,
+                phase: 0
+            };
+        }
         const value = {
             id,
             order: property === 'order' ? defaultHarmonic.order : harmonic.order,
