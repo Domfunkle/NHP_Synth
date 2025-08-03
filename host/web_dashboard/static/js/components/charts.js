@@ -85,14 +85,18 @@ export function singlePhaseWaveformChart(synth, canvasId) {
                 tooltip: { enabled: false }
             },
             scales: {
-                x: { display: false },
+                x: { 
+                    position: 'center',
+                    grid: { display: false , drawTicks: false },
+                    ticks: { display: false },
+                    border: { display: true, color: 'gray' }
+                },
                 yV: {
                     display: false,
                     position: 'left',
                     min: -voltageMax,
                     max: voltageMax,
-                    title: { display: false, text: 'Voltage (V)' },
-                    grid: { drawOnChartArea: false },
+                    title: { display: false, text: 'Voltage (V)' }
                 },
                 yI: {
                     display: false,
@@ -309,7 +313,12 @@ export function threePhaseWaveformChart(synths, canvasId) {
                 tooltip: { enabled: false }
             },
             scales: {
-                x: { display: false },
+                x: { 
+                    position: 'center',
+                    grid: { display: false , drawTicks: false },
+                    ticks: { display: false },
+                    border: { display: true, color: 'gray' }
+                },
                 yV: {
                     display: false,
                     position: 'left',

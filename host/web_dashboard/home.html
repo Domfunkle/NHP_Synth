@@ -175,8 +175,24 @@
     </script>
     <div class="d-flex justify-content-center align-items-center min-vh-100">
         <div class="container-fluid bg-secondary rounded shadow overflow-hidden" style="width:800px; height:480px;">
-            <div class="row bg-dark mb-2 align-items-center" style="min-height:38px;">
-                <div class="col text-end">
+            <div class="row bg-dark align-items-center mb-2">
+                <div class="col">
+                    <nav>
+                        <ul class="nav nav-tabs" id="main-tabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active text-light border-2" id="synth-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#synth-pane" type="button" role="tab" aria-controls="synth-pane" 
+                                    aria-selected="true">Synth Control</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link text-light border-2" id="settings-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#settings-pane" type="button" role="tab" aria-controls="settings-pane" 
+                                    aria-selected="false">Settings</button>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+                <div class="col-auto text-end">
                     <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()"
                         title="Force Refresh">
                         <span class="bi bi-arrow-clockwise"></span>
@@ -187,8 +203,25 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col" id="synth-cards">
-                    <!-- Synth cards will be dynamically inserted here -->
+                <div class="col p-0">
+                    <div class="tab-content px-2" id="main-tab-content">
+                        <div class="tab-pane fade show active h-100" id="synth-pane" role="tabpanel" 
+                            aria-labelledby="synth-tab" tabindex="0">
+                            <div id="synth-cards">
+                                <!-- Synth cards will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="settings-pane" role="tabpanel" 
+                            aria-labelledby="settings-tab" tabindex="0">
+                            <div class="d-flex justify-content-center align-items-center">
+                                <div class="text-center text-muted">
+                                    <i class="bi bi-gear-fill display-4 mb-3"></i>
+                                    <h5>Settings Panel</h5>
+                                    <p>Settings and configuration options will be available here.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
