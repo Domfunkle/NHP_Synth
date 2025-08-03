@@ -8,7 +8,7 @@ document.addEventListener('hidden.bs.offcanvas', function(event) {
 
 function synthCardItem({ synth, idx, phaseLabel }, AppState) {
     const phase = phaseLabel || `L${idx + 1}`;
-    const chartCanvasId = `waveform_combined_${idx}`;
+    const singlePhaseChartCanvasId = `waveform_single_phase_${idx}`;
     const scaledAmplitudeA = roundToPrecision((synth.amplitude_a / 100) * VOLTAGE_RMS_MAX, 1);
     const scaledAmplitudeB = roundToPrecision((synth.amplitude_b / 100) * CURRENT_RMS_MAX, 2);
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
@@ -27,63 +27,35 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
     function phaseCard() {
         return `
         <div class="row" data-bs-toggle="offcanvas" data-bs-target="#${offcanvasId('waveform')}">
-            <div class="col-7">
-                <div class="row h-100">
-                    <div class="col-auto px-1 fw-bold bg-gradient bg-${phase}">
-                        ${phase}
-                    </div>
-                    <div class="col text-start px-0">
-                        <div class="text-${phase}-voltage">
-                            <span style="white-space:pre" class="${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1).padStart(6, ' ')} V</span>
-                            <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_a.toFixed(1).padStart(6, ' ')}°</span>
-                        </div>
-                        <div class="text-${phase}-current">
-                            <span style="white-space:pre" class="${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2).padStart(6, ' ')} A</span>
-                            <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_b.toFixed(1).padStart(6, ' ')}°</span>
-                        </div>
-                        <div>
-                            <span style="white-space:pre">${synth.frequency_a.toFixed(1).padStart(6, ' ')} Hz</span>
-                        </div>
-                    </div>
-                    <div class="col-auto ">
-                        <div class="row">
-                            <div class="col">cos&phi; ${Math.abs(DPF(synth.phase_a, synth.phase_b)).toFixed(3)}</div>
-                        </div>
-                        <div class="row">
-                            <div class="col">PF ${Math.abs(truePF(synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3)}</div>
-                        </div>
-                    </div>
-                    <div class="col-auto px-0">
-                        <div class="row">
-                            <div style="white-space:pre" class="col">${(0.001 * realPower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1, synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kW").padEnd(5,' ')}</div>
-                        </div>
-                        <div class="row">
-                            <div style="white-space:pre" class="col">${(0.001 * apparentPower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1)).toFixed(3) + (" kVA").padEnd(5,' ')}</div>
-                        </div>
-                        <div class="row">
-                            <div class="col">${(0.001 * reactivePower(synth.amplitude_a * 2.4, synth.amplitude_b * 0.1, synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kVAr").padEnd(5,' ')}</div>
-                        </div>
-                    </div>
-                </div>
+            <div class="col-auto px-1 bg-gradient bg-${phase}">
+                <div class="fw-bold">${phase}</div>
+                <div class="small">${synth.frequency_a.toFixed(1)} Hz</div>
             </div>
-
-            <div class="col pe-1">
-                <div class="border-${phase}-voltage rounded w-100 p-1 ${highlightIfSelected('harmonics', idx, 'a') ? 'highlighted' : ''}">
-                    <table class="table table-sm table-borderless mb-0 small">
-                        <tbody>
-                            ${harmonicsCells(synth.harmonics_a, "voltage")}
-                        </tbody>
-                    </table>
+            <div class="col-3 px-2 text-start">
+                <div class="text-${phase}-voltage">
+                    <span style="white-space:pre" class="${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1).padStart(6, ' ')} V</span>
+                    <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_a.toFixed(1).padStart(6, ' ')}°</span>
                 </div>
+                <div class="text-${phase}-current">
+                    <span style="white-space:pre" class="${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2).padStart(6, ' ')} A</span>
+                    <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_b.toFixed(1).padStart(6, ' ')}°</span>
+                </div>
+                
             </div>
-            <div class="col ps-1">
-                <div class="border-${phase}-current rounded w-100 p-1 ${highlightIfSelected('harmonics', idx, 'b') ? 'highlighted' : ''}">
-                    <table class="table table-sm table-borderless mb-0 small">
-                        <tbody>
-                            ${harmonicsCells(synth.harmonics_b, "current")}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="col px-2 text-center">
+                <div class="text-${phase}-voltage ${highlightIfSelected('harmonics', idx, 'a') ? 'highlighted' : ''}" style="white-space:pre">THD<sub>V</sub> ${Math.abs(THD(synth.harmonics_a)*100).toFixed(1).padStart(5,' ')} %</div>
+                <div class="text-${phase}-current ${highlightIfSelected('harmonics', idx, 'b') ? 'highlighted' : ''}" style="white-space:pre">THD<sub>I</sub> ${Math.abs(THD(synth.harmonics_b)*100).toFixed(1).padStart(5,' ')} %</div>
+            </div>
+            <div class="col px-2  text-center">
+                <div style="white-space:pre">cos&phi; ${Math.abs(DPF(synth.phase_a, synth.phase_b)).toFixed(3).padStart(5,' ')}</div>
+                <div style="white-space:pre">PF   ${Math.abs(truePF(synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3).padStart(5,' ')}</div>
+            </div>
+            <div class="col px-2  text-center">
+                <div style="white-space:pre">S ${(0.001 * apparentPower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100))).toFixed(3) + (" kVA").padEnd(5,' ')}</div>
+                <div>Q ${(0.001 * reactivePower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kVAr").padEnd(5,' ')}</div>
+            </div>
+            <div class="col px-2  text-center">
+                <div style="white-space:pre">P ${(0.001 * activePower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kW").padEnd(5,' ')}</div>
             </div>
         </div>
         `;
@@ -97,15 +69,17 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                 <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body pt-0 p-2" style="overflow-y:hidden; overflow-x:hidden;">
-                <div class="row m-1 pb-2">
-                    <div class="card p-3 bg-dark font-monospace">
+                <div class="row m-1 pb-1">
+                    <div class="card py-1 px-3 bg-dark font-monospace">
                         ${phaseCard()}
                     </div>
                 </div>
                 <div class="row justify-content-center px-2">
                     
-                    <div class="col px-4">
-                        <canvas class="py-2" id="${chartCanvasId}" width="330" height="80" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                    <div class="col-6 px-4">
+                        <div class="row py-1 mb-1 border rounded">
+                            <canvas id="${singlePhaseChartCanvasId}" width="360" height="80" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                        </div>
                         <div class="row">
                             ${harmonicOffCanvas(synth, idx, 'a')}
                             ${harmonicOffCanvas(synth, idx, 'b')}
@@ -157,10 +131,10 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
         const waveSub = channel === 'a' ? 'v' : 'i';
         const waveType = channel === 'a' ? 'voltage' : 'current';
     return `
-        <div class="col-6 px-1">
+        <div class="col-6 px-0">
             <table class="table table-sm mb-2 text-center border-${phase}-${waveType}">
                 <thead>
-                    <tr>
+                    <tr class="small py-1">
                         <th>H<sub>${waveSub}</sub></th>
                         <th>%</th>
                         <th>&Phi;</th>
@@ -207,5 +181,11 @@ export function SynthCards(AppState) {
     <div class="card">
         ${synths.map((synth, idx) => synthCardItem({ synth, idx, phaseLabel: phaseLabels[idx] }, AppState)).join('')}
     </div>
-`;
+    <div class="card" style="min-height:40vh; background: #222; color: #fff;">
+        <div class="card-header py-1"></div>
+        <div class="card-body">
+            <canvas id="waveform_three_phase" width="700" height="180" style="display:block;margin:auto;cursor:pointer;"></canvas>
+        </div>
+    </div>
+    `;
 }

@@ -64,8 +64,12 @@
                     cardsContainer.innerHTML = SynthCards(AppState);
                     // After DOM update, render combined waveforms for each synth
                     AppState.synthState.synths.forEach((synth, idx) => {
-                        synthWaveformChart(synth, `waveform_combined_${idx}`);
+                        singlePhaseWaveformChart(synth, `waveform_single_phase_${idx}`);
                     });
+                    // Render the single three-phase waveform (requires all synths)
+                    if (AppState.synthState.synths.length >= 3) {
+                        threePhaseWaveformChart(AppState.synthState.synths, `waveform_three_phase`);
+                    }
                     console.log(AppState);
 
                     // Restore selected input group if any
@@ -183,7 +187,7 @@
                 </div>
             </div>
             <div class="row">
-                <div class="col-12" id="synth-cards">
+                <div class="col" id="synth-cards">
                     <!-- Synth cards will be dynamically inserted here -->
                 </div>
             </div>

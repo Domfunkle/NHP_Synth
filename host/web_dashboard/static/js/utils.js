@@ -44,7 +44,7 @@ export function reactivePower(voltageRMS, currentRMS, phaseA, phaseB, harmonics=
 }
 
 // Calculate real power
-export function realPower(voltageRMS, currentRMS, phaseA, phaseB, harmonics=[]) {
+export function activePower(voltageRMS, currentRMS, phaseA, phaseB, harmonics=[]) {
     const pf = truePF(phaseA, phaseB, harmonics);
     return +(apparentPower(voltageRMS, currentRMS) * pf);
 }

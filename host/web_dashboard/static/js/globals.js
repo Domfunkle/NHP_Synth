@@ -2,8 +2,8 @@
 
 // Components
 import { SynthCards } from './components/components.js';
-import { synthWaveformChart } from './components/charts.js';
-import { harmonicsCells } from './components/harmonicsCells.js';
+import { singlePhaseWaveformChart, threePhaseWaveformChart } from './components/charts.js';
+import { vectorChart } from './components/vectorChart.js';
 import { incrementButtons } from './components/incrementButtons.js';
 import { selected, setSelected, clearSelected, incrementSelected, resetSelected } from './components/selection.js';
 
@@ -31,14 +31,15 @@ import {
 // Utilities
 import {
     DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner,
-    trueRMS, apparentPower, reactivePower, realPower, roundToPrecision,
+    trueRMS, apparentPower, reactivePower, activePower, roundToPrecision,
     VOLTAGE_RMS_MAX, CURRENT_RMS_MAX
 } from './utils.js';
 
 // Components
 window.SynthCards = SynthCards;
-window.synthWaveformChart = synthWaveformChart;
-window.harmonicsCells = harmonicsCells;
+window.singlePhaseWaveformChart = singlePhaseWaveformChart;
+window.threePhaseWaveformChart = threePhaseWaveformChart;
+window.vectorChart = vectorChart;
 window.incrementButtons = incrementButtons;
 
 // Selection
@@ -89,7 +90,7 @@ window.truePF = truePF;
 window.trueRMS = trueRMS;
 window.apparentPower = apparentPower;
 window.reactivePower = reactivePower;
-window.realPower = realPower;
+window.activePower = activePower;
 window.getGlobalFrequencyHz = getGlobalFrequencyHz;
 window.LoadingSpinner = LoadingSpinner;
 window.roundToPrecision = roundToPrecision;
