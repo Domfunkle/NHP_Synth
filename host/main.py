@@ -80,10 +80,14 @@ def main():
 
             # Clean shutdown
             logger.info("Shutting down...")
-            # for i, synth in enumerate(synths):
-            #     synth.set_amplitude('a', 0)
-            #     synth.set_amplitude('b', 0)
-            # logger.info("All amplitudes set to 0")
+            for i, synth in enumerate(synths):
+                if not state.synths[i]['auto_on']:
+                    command_queue.put({'synth_id': i, 'command': 'set_enabled', 'channel': 'a', 'value': False})
+                    command_queue.put({'synth_id': i, 'command': 'set_enabled', 'channel': 'b', 'value': False})
+                    logger.info(f"Synth {i} output disable commands queued.")
+            
+            # Process the shutdown commands
+            process_command_queue(command_queue, synths, state)
 
         finally:
             # Save final state before exiting

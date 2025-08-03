@@ -1,5 +1,10 @@
 [
   {
+    "auto_on": false,
+    "enabled": {
+      "a": false,
+      "b": false
+    },
     "amplitude_a": 96.0,
     "amplitude_b": 50.0,
     "frequency_a": 50.0,
@@ -35,6 +40,11 @@
     ]
   },
   {
+    "auto_on": false,
+    "enabled": {
+      "a": false,
+      "b": false
+    },
     "amplitude_a": 96.0,
     "amplitude_b": 50.0,
     "frequency_a": 50.0,
@@ -70,6 +80,11 @@
     ]
   },
   {
+    "auto_on": false,
+    "enabled": {
+      "a": false,
+      "b": false
+    },
     "amplitude_a": 96.0,
     "amplitude_b": 50.0,
     "frequency_a": 50.0,

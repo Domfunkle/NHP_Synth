@@ -1,6 +1,18 @@
 // synthHandlers.js
 // All event handler functions for synth controls
 
+export async function setEnabled(idx, channel, enabled) {
+    try {
+        const synthState = getSynthState();
+        if (!synthState) return;
+        const currentlyEnabled = synthState.synths[idx]["enabled"][channel];
+        if (currentlyEnabled === enabled) return; // No change needed
+        await setSynthEnabled(idx, channel, enabled);
+    } catch (error) {
+        console.error(`toggleEnabled: error toggling ${channel} enabled state`, error);
+    }
+}
+
 export async function incrementVoltage(idx, delta) {
     try {
         const synthState = getSynthState();

@@ -19,11 +19,13 @@ class EncoderManager:
         """
         self.encoders = encoders
         self.led_colors = led_colors
-        self.hold_threshold = hold_threshold
+        self.short_hold_threshold = hold_threshold  # 1.0s for enable/disable toggle
+        self.long_hold_threshold = 3.0  # 3.0s for reset to defaults
         self.state = state
         self.synth_interface = synth_interface
         self.button_hold_time = {k: None for k in encoders}
-        self.was_held = {k: False for k in encoders}
+        self.was_short_held = {k: False for k in encoders}
+        self.was_long_held = {k: False for k in encoders}
         self.selection_mode = {k: {'synth': 'all', 'ch': 'all'} for k in encoders}
         self.state.selection_mode = self.selection_mode  # Share selection mode with state manager
         self.selection_mode_last_changed = {k: time.time() for k in encoders}  # Track last change time for each func
@@ -49,18 +51,27 @@ class EncoderManager:
             if encoder.button_pressed:
                 if self.button_hold_time[func] is None:
                     self.button_hold_time[func] = now
-                    self.was_held[func] = False
-                elif not self.was_held[func] and now - self.button_hold_time[func] > self.hold_threshold:
-                    self.was_held[func] = True
-                    self.on_hold(func)
+                    self.was_short_held[func] = False
+                    self.was_long_held[func] = False
+                elif not self.was_short_held[func] and now - self.button_hold_time[func] > self.short_hold_threshold:
+                    self.was_short_held[func] = True
+                    # Visual feedback only - command sent on release
+                    self.encoders[func].set_pixel((255, 255, 0))  # Yellow for enable/disable toggle
+                elif not self.was_long_held[func] and now - self.button_hold_time[func] > self.long_hold_threshold:
+                    self.was_long_held[func] = True
+                    # Visual feedback only - command sent on release
+                    self.encoders[func].set_pixel((255, 255, 255))  # White for reset
             else:
                 if self.button_hold_time[func] is not None:
-                    if self.was_held[func]:
-                        self.on_release_after_hold(func)
+                    if self.was_long_held[func]:
+                        self.on_release_after_long_hold(func)
+                    elif self.was_short_held[func]:
+                        self.on_release_after_short_hold(func)
                     else:
                         self.on_press(func)
                     self.button_hold_time[func] = None
-                    self.was_held[func] = False
+                    self.was_short_held[func] = False
+                    self.was_long_held[func] = False
 
     def on_rotate(self, func, delta):
         """Handle rotation for each encoder based on its own selection_mode and func. Reset inactivity timer."""
@@ -117,17 +128,68 @@ class EncoderManager:
         self.selection_mode[func] = selection_modes[next_index]
         logger.info(f"Selection mode for {func} changed to Synth {self.selection_mode[func]['synth']}, Channel {self.selection_mode[func]['ch']}")
 
-    def on_hold(self, func):
-        """Handle button hold: send synth commands using self.state.defaults for the selected synth/channel."""
-        logger.info(f"{func}: Button held")
-        self.encoders[func].set_pixel((255, 255, 255))
+    def on_short_hold(self, func):
+        """Legacy method - commands now executed on release."""
+        pass
 
+    def on_long_hold(self, func):
+        """Legacy method - commands now executed on release."""
+        pass
+
+    def on_hold(self, func):
+        """Legacy method - now handled by on_release_after_long_hold."""
+        pass
+
+    def on_release_after_hold(self, func):
+        """Legacy method - now handled by on_release_after_long_hold."""
+        pass
+
+    def _toggle_channel_enabled(self, channel, func):
+        """Toggle enabled state for the specified channel based on selection mode."""
+        mode = self.selection_mode.get(func, {'synth': 'all', 'ch': channel})
+        
+        if mode['synth'] == 'all':
+            # Toggle all synths for this channel
+            logger.info(f"Toggling channel {channel} enable/disable for all synths")
+            for i in range(self.state.num_synths):
+                current_state = self.state.synths[i]['enabled'][channel]
+                new_state = not current_state
+                self.state.synths[i]['enabled'][channel] = new_state
+                self.synth_interface[i].set_enabled(channel, new_state)
+                logger.info(f"Synth {i} channel {channel}: {current_state} -> {new_state}")
+        else:
+            # Toggle specific synth for this channel
+            synth_id = mode['synth']
+            current_state = self.state.synths[synth_id]['enabled'][channel]
+            new_state = not current_state
+            self.state.synths[synth_id]['enabled'][channel] = new_state
+            self.synth_interface[synth_id].set_enabled(channel, new_state)
+            logger.info(f"Synth {synth_id} channel {channel}: {current_state} -> {new_state}")
+
+    def on_release_after_short_hold(self, func):
+        """Handle release after short hold: execute enable/disable toggle."""
+        logger.info(f"{func}: Button released after short hold - executing enable/disable toggle")
+        
+        # Only voltage and current encoders support enable/disable toggle
+        if func == 'voltage':
+            self._toggle_channel_enabled('a', func)
+        elif func == 'current':
+            self._toggle_channel_enabled('b', func)
+        else:
+            logger.info(f"{func}: Short hold not supported for this encoder")
+        
+        self.encoders[func].set_pixel(self.led_colors[func])
+
+    def on_release_after_long_hold(self, func):
+        """Handle release after long hold: execute reset to defaults."""
+        logger.info(f"{func}: Button released after long hold - executing reset to defaults")
+        
         mode = self.selection_mode.get(func, {'synth': 'all', 'ch': 'all'})
         defaults = self.state.defaults
         synths = self.state.synths
         synth_interface = self.synth_interface
 
-        # Helper to send command for a synth/channel
+        # Helper to send command for a synth/channel (existing reset logic)
         def send_default(synth_id, channel):
             if func == 'voltage':
                 value = defaults[synth_id]['amplitude_a']
@@ -194,7 +256,7 @@ class EncoderManager:
                     if extra_count > 0:
                         del synth_harmonics[len(default_harmonics):]
 
-        # Determine which synths/channels to send
+        # Determine which synths/channels to send (existing logic)
         if mode['synth'] == 'all':
             for synth_id in range(self.state.num_synths):
                 if func == 'frequency':
@@ -215,10 +277,7 @@ class EncoderManager:
                     send_default(synth_id, ch)
             else:
                 send_default(synth_id, mode['ch'])
-
-    def on_release_after_hold(self, func):
-        """Override this method to handle release after hold for each encoder."""
-        logger.info(f"{func}: Button released after hold")
+        
         self.encoders[func].set_pixel(self.led_colors[func])
 
     def set_led(self, func, color):

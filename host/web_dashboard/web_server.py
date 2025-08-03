@@ -41,6 +41,20 @@ def create_app(command_queue, state_manager):
             'value': value
         }
         return jsonify(queue_command(command))
+    
+    @app.route('/api/synths/<int:synth_id>/enabled', methods=['POST'])
+    def set_enabled(synth_id):
+        data = request.json
+        enabled = data.get('enabled')
+        if not isinstance(enabled, bool):
+            return jsonify({'error': 'Invalid enabled value'}), 400
+        command = {
+            'synth_id': synth_id,
+            'command': 'set_enabled',
+            'channel': data.get('channel'),
+            'value': enabled
+        }
+        return jsonify(queue_command(command))
 
     @app.route('/api/synths/<int:synth_id>/amplitude', methods=['POST'])
     def set_amplitude(synth_id):

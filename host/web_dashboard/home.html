@@ -109,6 +109,38 @@
         // --- Socket.IO and Event Logic ---
         const socket = io();
         setSocket(socket);
+        
+        // Connection status indicator
+        function updateConnectionStatus(connected) {
+            const statusElement = document.getElementById('connection-status');
+            const iconElement = document.getElementById('connection-icon');
+            if (statusElement && iconElement) {
+                if (connected) {
+                    iconElement.className = 'bi bi-ethernet text-success fs-4';
+                    statusElement.title = 'Socket Connected';
+                } else {
+                    iconElement.className = 'bi bi-ethernet text-danger fs-4';
+                    statusElement.title = 'Socket Disconnected';
+                }
+            }
+        }
+        
+        // Socket connection event handlers
+        socket.on('connect', function() {
+            console.log('Socket connected');
+            updateConnectionStatus(true);
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Socket disconnected');
+            updateConnectionStatus(false);
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.log('Socket connection error:', error);
+            updateConnectionStatus(false);
+        });
+        
         socket.on('synthState', function (data) {
             if (!synthStateEquals(AppState.synthState, data)) {
                 // Assign synthetic id if missing
@@ -193,13 +225,18 @@
                     </nav>
                 </div>
                 <div class="col-auto text-end">
-                    <button class="btn btn-sm btn-outline-light me-2" onclick="window.location.reload()"
-                        title="Force Refresh">
-                        <span class="bi bi-arrow-clockwise"></span>
-                    </button>
-                    <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
-                        <span id="fullscreen-icon"><span class="bi bi-fullscreen"></span></span>
-                    </button>
+                    <div class="hstack gap-2">
+                        <button class="btn btn-sm btn-outline-light" onclick="window.location.reload()"
+                            title="Force Refresh">
+                            <span class="bi bi-arrow-clockwise"></span>
+                        </button>
+                        <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
+                            <span id="fullscreen-icon"><span class="bi bi-fullscreen"></span></span>
+                        </button>
+                        <span class="fs-5" id="connection-status" title="Socket Connection Status">
+                            <span class="bi bi-ethernet text-danger fs-4" id="connection-icon"></span>
+                        </span>
+                    </div>
                 </div>
             </div>
             <div class="row">

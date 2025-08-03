@@ -21,7 +21,7 @@
 #define SQUARE_WAVE_INPUT 19
 #define SQUARE_WAVE_HZ 50
 #define PERIOD_US 50         // period in microseconds for DDS output
-#define AMPL_RAMP_STEP 1e-4 // Adjust for ramp speed (smaller = slower)
+#define AMPL_RAMP_STEP 1e-3 // Adjust for ramp speed (smaller = slower)
 #define MAX_HARMONICS 8 // Maximum harmonics across both channels
 #define PHASE_SCALE (int)(TABLE_SIZE / (2.0 * M_PI))
 #define M_PI_180 (M_PI / 180.0f)
@@ -45,6 +45,8 @@ static volatile float current_freq[2] = {50, 50}; // [A, B]
 static volatile float current_phase[2] = {0, 0};
 static volatile float current_ampl[2] = {0.0f, 0.0f}; // Used for output (ramped)
 static volatile float target_ampl[2] = {0.0f, 0.0f}; // Set by UART, ramped to
+static volatile bool enable_output[2] = {false, false}; // Per-channel DAC output enable/disable [A, B]
+static volatile float output_scale[2] = {0.0f, 0.0f}; // Per-channel output scaling for enable/disable ramping
 
 static volatile uint32_t dds_acc[2] = {0, 0};
 static volatile uint32_t dds_step[2] = {1, 1};
@@ -222,6 +224,21 @@ static void uart_cmd_task(void *arg) {
                     target_ampl[ch_idx] = ampl / 100.0f;
                     // ESP_LOGI(TAG, "UART: Set channel %c amplitude to %.2f (0-100, scaled to 0.0-1.0)", ch_idx == 0 ? 'A' : 'B', ampl);
 
+                // Read output enable state: rena / renb
+                } else if (strncmp(cmd_buf, "ren", 3) == 0 && (cmd_buf[3] == 'a' || cmd_buf[3] == 'b')) {
+                    int ch_idx = (cmd_buf[3] == 'a') ? 0 : 1;
+                    char response[32];
+                    snprintf(response, sizeof(response), "ren%c%d\r\n", 
+                             ch_idx == 0 ? 'a' : 'b', enable_output[ch_idx] ? 1 : 0);
+                    uart_write_bytes(UART_NUM, response, strlen(response));
+
+                // Write output enable state: wena0/wena1 or wenb0/wenb1
+                } else if (strncmp(cmd_buf, "wen", 3) == 0 && (cmd_buf[3] == 'a' || cmd_buf[3] == 'b')) {
+                    int ch_idx = (cmd_buf[3] == 'a') ? 0 : 1;
+                    int enable = strtol(cmd_buf + 4, NULL, 10);
+                    enable_output[ch_idx] = (enable != 0);
+                    // ESP_LOGI(TAG, "UART: Set channel %c output enable to %s", ch_idx == 0 ? 'A' : 'B', enable_output[ch_idx] ? "true" : "false");
+
                 // Shortcut: clear all harmonics for a channel (must come before wh[a|b] command)
                 } else if ((strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'a') ||
                            (strncmp(cmd_buf, "whcl", 4) == 0 && cmd_buf[4] == 'b')) {
@@ -311,14 +328,16 @@ static void uart_cmd_task(void *arg) {
                     }
                 } else if (strcmp(cmd_buf, "help") == 0) {
                     const char *help_msg =
-                        "Command: [r|w][f|p|a|h][a|b][<args>]\r\n"
-                        "  r=read, w=write; f=frequency, p=phase, a=amplitude, h=harmonic\r\n"
+                        "Command: [r|w][f|p|a|h|en][a|b][<args>]\r\n"
+                        "  r=read, w=write; f=frequency, p=phase, a=amplitude, h=harmonic, en=enable\r\n"
                         "  a=ch A, b=ch B; <args>=value(s) for write\r\n"
                         "\r\n"
                         "Harmonic: wh[a|b]<n>,<percent>[,<phase_deg>]\r\n"
                         "  n=odd harmonic (>=3), percent=0-100, phase_deg=deg (optional)\r\n"
                         "Special:\r\n"
                         "  whcl[a|b]   Clear all harmonics for A/B\r\n"
+                        "  ren[a|b]    Read output enable state for A/B (0=disabled, 1=enabled)\r\n"
+                        "  wen[a|b][0|1] Write output enable state for A/B (0=disable, 1=enable)\r\n"
                         "  help        Show this help\r\n"
                         "\r\n"
                         "Examples:\r\n"
@@ -328,6 +347,9 @@ static void uart_cmd_task(void *arg) {
                         "  wpa-90      Set phase A to -90 deg\r\n"
                         "  rab         Read amp B (ex. response rab55.0 = 55.0 %)\r\n"
                         "  waa50       Set amp A to 50%\r\n"
+                        "  rena        Read enable state A (ex. response rena1 = enabled)\r\n"
+                        "  wena0       Disable DAC output A\r\n"
+                        "  wenb1       Enable DAC output B\r\n"
                         "  rha         Read harmonics A (ex. response rha3,10.0,0.0;5,20.0,-90.0; = 3rd 10% 0 deg; 5th 20% -90 deg)\r\n"
                         "  wha3,10     Set 3rd harm A to 10%\r\n"
                         "  whb5,5,-90  Set 5th harm B to 5%, -90 deg\r\n";
@@ -392,6 +414,17 @@ static void dds_output(void) {
             current_ampl[ch] = target_ampl[ch];
         }
 
+        // Output enable/disable scaling - ramp output_scale based on enable_output state
+        float target_scale = enable_output[ch] ? 1.0f : 0.0f;
+        if (fabsf(output_scale[ch] - target_scale) > AMPL_RAMP_STEP) {
+            if (output_scale[ch] < target_scale)
+                output_scale[ch] += AMPL_RAMP_STEP;
+            else
+                output_scale[ch] -= AMPL_RAMP_STEP;
+        } else {
+            output_scale[ch] = target_scale;
+        }
+
         // Phase accumulator for this sample
         uint32_t phase_acc = (dds_acc[ch] + (uint32_t)(current_phase[ch] * PHASE_SCALE)) % TABLE_SIZE;
         // Use helper to get base waveform value
@@ -415,6 +448,9 @@ static void dds_output(void) {
         
         // Apply amplitude scaling first
         val *= current_ampl[ch];
+        
+        // Apply output enable/disable scaling
+        val *= output_scale[ch];
         
         // Convert to 0-255 range
         float dac_val = (val * 127.5f) + 127.5f;

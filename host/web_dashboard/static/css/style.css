@@ -12,6 +12,13 @@
     --L3-current-color: hsl(220, 100%, 60%);
 }
 
+.dot {
+    height: 10px;
+    width: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
 .selected {
     outline: 2px solid currentColor;
     border-radius: 0.375rem;

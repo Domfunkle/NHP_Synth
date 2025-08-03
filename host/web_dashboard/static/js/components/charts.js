@@ -135,16 +135,18 @@ export function threePhaseWaveformChart(synths, canvasId) {
     const L2_current_phase = synth_L2.phase_b;
     const L3_current_phase = synth_L3.phase_b;
 
+    const L1_frequency = synth_L1.frequency_a;
+    
     const cycles = 2;
     const N = 200;
     const x = Array.from({ length: (N * cycles) }, (_, i) => i / N);
 
     function sumHarmonics(t, amplitude, phase, harmonics) {
-        let y = amplitude * Math.sin(2 * Math.PI * t + (phase * Math.PI / 180));
+        let y = amplitude * Math.sin(2 * Math.PI * L1_frequency/40 * t + (phase * Math.PI / 180));
         if (Array.isArray(harmonics)) {
             harmonics.forEach(h => {
                 const harmAmplitude = amplitude * (h.amplitude / 100);
-                y += harmAmplitude * Math.sin(2 * Math.PI * h.order * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
+                y += harmAmplitude * Math.sin(2 * Math.PI * h.order * L1_frequency/40 * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
             });
         }
         return y;
@@ -156,8 +158,8 @@ export function threePhaseWaveformChart(synths, canvasId) {
     const y_L2_current = x.map(t => sumHarmonics(t, L2_current_amplitude, L2_current_phase, synth_L2.harmonics_b));
     const y_L3_current = x.map(t => sumHarmonics(t, L3_current_amplitude, L3_current_phase, synth_L3.harmonics_b));
 
-    const voltageMax = Math.max(L1_voltage_amplitude, L2_voltage_amplitude, L3_voltage_amplitude) * 1.1;
-    const currentMax = Math.max(L1_current_amplitude, L2_current_amplitude, L3_current_amplitude) * 1.1;
+    const voltageMax = VOLTAGE_RMS_MAX * sqrt2;
+    const currentMax = CURRENT_RMS_MAX * sqrt2;
 
     const rootStyles = getComputedStyle(document.documentElement);
     const phaseColorL1 = rootStyles.getPropertyValue('--L1-voltage-color').trim();
@@ -322,16 +324,16 @@ export function threePhaseWaveformChart(synths, canvasId) {
                 yV: {
                     display: false,
                     position: 'left',
-                    min: -voltageMax,
-                    max: voltageMax,
+                    min: -voltageMax * 1.1,
+                    max: voltageMax * 1.1,
                     title: { display: false, text: 'Voltage (V)' },
                     grid: { drawOnChartArea: false },
                 },
                 yI: {
                     display: false,
                     position: 'right',
-                    min: -currentMax,
-                    max: currentMax,
+                    min: -currentMax * 1.1,
+                    max: currentMax * 1.1,
                     title: { display: false, text: 'Current (A)' },
                     grid: { drawOnChartArea: false },
                 }

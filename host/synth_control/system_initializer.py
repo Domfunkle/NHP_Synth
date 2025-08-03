@@ -168,6 +168,8 @@ class SystemInitializer:
                     device_name = device_path.split('/')[-1]
                     # Test comms by reading parameters for both channels
                     try:
+                        enabled_a = synth.get_enabled('a')
+                        enabled_b = synth.get_enabled('b')
                         amp_a = synth.get_amplitude('a')
                         amp_b = synth.get_amplitude('b')
                         freq_a = synth.get_frequency('a')
@@ -176,7 +178,7 @@ class SystemInitializer:
                         phase_b = synth.get_phase('b')
                         harmonics_a = synth.get_harmonics('a')
                         harmonics_b = synth.get_harmonics('b')
-                        logger.debug(f"amp_a={amp_a}, amp_b={amp_b}, freq_a={freq_a}, freq_b={freq_b}, phase_a={phase_a}, phase_b={phase_b}, harmonics_a={harmonics_a}, harmonics_b={harmonics_b}")
+                        logger.debug(f"enabled_a={enabled_a}, enabled_b={enabled_b}, amp_a={amp_a}, amp_b={amp_b}, freq_a={freq_a}, freq_b={freq_b}, phase_a={phase_a}, phase_b={phase_b}, harmonics_a={harmonics_a}, harmonics_b={harmonics_b}")
                         # Round-trip set/get test for frequency (set to current value)
                         try:
                             synth.set_frequency('a', freq_a)
@@ -220,6 +222,12 @@ class SystemInitializer:
                 synth_state = state_manager.synths[i] if i < len(state_manager.synths) else None
                 if synth_state:
                     try:
+                        if not synth_state.get('auto_on', False):
+                            synth.set_enabled('a', False)
+                            synth.set_enabled('b', False)
+                        else:
+                            synth.set_enabled('a', synth_state.get('enabled', {}).get('a', False))
+                            synth.set_enabled('b', synth_state.get('enabled', {}).get('b', False))
                         synth.set_amplitude('a', synth_state.get('amplitude_a', 0))
                         synth.set_amplitude('b', synth_state.get('amplitude_b', 0))
                         synth.set_frequency('a', synth_state.get('frequency_a', 50))

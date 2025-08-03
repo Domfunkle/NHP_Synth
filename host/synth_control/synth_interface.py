@@ -8,6 +8,7 @@ import serial
 import time
 from typing import Optional, Union
 import logging
+from utils.command_parser import parse_synth_command
 logger = logging.getLogger("NHP_Synth")
 
 class SynthInterface:
@@ -61,12 +62,53 @@ class SynthInterface:
             return False
 
         try:
-            logger.debug(f"Synth # {self.id} sent cmd: {command}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Synth # {self.id} sending cmd: {command} \t\t {parse_synth_command(command)}")
+                
             self.ser.write(f"{command}\r".encode())
             return True
         except Exception as e:
             logger.error(f"Failed to send command: {e}")
             return False
+        
+    def get_enabled(self, channel: str) -> bool:
+        """
+        Check if output is enabled for a channel
+        
+        Args:
+            channel: 'a' or 'b'
+        Returns:
+            True if output is enabled, False otherwise
+        """
+        if channel.lower() not in ['a', 'b']:
+            raise ValueError("Channel must be 'a' or 'b'")
+        self.send_command(f"ren{channel.lower()}")
+        response = self.ser.readline().decode().strip()
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Synth # {self.id} rcvd res: {response} \t\t {parse_synth_command(response)}")
+            
+        try:
+            return response.lower() == f"ren{channel.lower()}1"
+        except Exception as e:
+            logger.error(f"Synth # {self.id} invalid output enabled response: {response}")
+            return False 
+        
+    def set_enabled(self, channel: str, enabled: bool) -> bool:
+        """
+        Enable or disable output for a channel
+        
+        Args:
+            channel: 'a' or 'b'
+            enabled: True to enable, False to disable
+            
+        Returns:
+            True if command sent successfully
+        """
+        if channel.lower() not in ['a', 'b']:
+            raise ValueError("Channel must be 'a' or 'b'")
+        
+        command = f"wen{channel.lower()}{1 if enabled else 0}"
+        return self.send_command(command)
 
     def get_frequency(self, channel: str) -> Union[float, None]:
         """
@@ -84,8 +126,9 @@ class SynthInterface:
         
         self.send_command(f"rf{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        logger.debug(f"Synth # {self.id} rcvd res: {response}")
-        
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Synth # {self.id} rcvd freq res: {response} \t\t {parse_synth_command(response)}")
+            
         try:
             return float(response.split(f"rf{channel.lower()}")[-1])
         except (ValueError, IndexError):
@@ -126,8 +169,9 @@ class SynthInterface:
         
         self.send_command(f"ra{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        logger.debug(f"Synth # {self.id} rcvd res: {response}")
-        
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Synth # {self.id} rcvd res: {response} \t\t {parse_synth_command(response)}")
+            
         try:
             return float(response.split(f"ra{channel.lower()}")[-1])
         except (ValueError, IndexError):
@@ -168,7 +212,8 @@ class SynthInterface:
         
         self.send_command(f"rp{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        logger.debug(f"Synth # {self.id} rcvd phase res: {response}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Synth # {self.id} rcvd phase res: {response} \t\t {parse_synth_command(response)}")
 
         try:
             return float(response.split(f"rp{channel.lower()}")[-1])
@@ -212,7 +257,8 @@ class SynthInterface:
 
         self.send_command(f"rh{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        logger.debug(f"Synth # {self.id} rcvd harmonics res: {response}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Synth # {self.id} rcvd harmonics res: {response} \t\t {parse_synth_command(response)}")
 
         harmonics = []
         try:

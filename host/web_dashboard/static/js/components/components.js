@@ -31,13 +31,13 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                 <div class="fw-bold">${phase}</div>
                 <div class="small">${synth.frequency_a.toFixed(1)} Hz</div>
             </div>
-            <div class="col-3 px-2 text-start" style="border-left: 1px solid gray;">
+            <div class="col-3 px-1 text-start" style="border-left: 1px solid gray;">
                 <div class="text-${phase}-voltage">
-                    <span style="white-space:pre" class="${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1).padStart(6, ' ')} V</span>
+                    <span class="dot mx-1 ${synth.enabled.a ? 'bg-success' : 'bg-danger'}"></span><span style="white-space:pre" class="${highlightIfSelected('voltage', idx, 'a') ? 'highlighted' : ''}" id="voltageDisplay">${scaledAmplitudeA.toFixed(1).padStart(6, ' ')} V</span>
                     <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'a') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_a.toFixed(1).padStart(6, ' ')}°</span>
                 </div>
                 <div class="text-${phase}-current">
-                    <span style="white-space:pre" class="${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2).padStart(6, ' ')} A</span>
+                    <span class="dot mx-1 ${synth.enabled.b ? 'bg-success' : 'bg-danger'}"></span><span style="white-space:pre" class="${highlightIfSelected('current', idx, 'b') ? 'highlighted' : ''}" id="currentDisplay">${scaledAmplitudeB.toFixed(2).padStart(6, ' ')} A</span>
                     <span style="white-space:pre" class="${highlightIfSelected('phase', idx, 'b') ? 'highlighted' : ''}" id="phaseDisplay">&ang; ${synth.phase_b.toFixed(1).padStart(6, ' ')}°</span>
                 </div>
                 
@@ -119,6 +119,20 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                     <div class="col-2">
                         <div class="row" id="increment_buttons_${idx}">
                             ${incrementButtons()}
+                        </div>
+                        <div class="vstack gap-2 mt-2">
+                            <div class="d-flex flex-row gap-2">
+                                <button type="button" class="btn p-2 w-50 ${synth.enabled.a ? 'btn-success' : 'btn-danger'} d-flex align-items-center justify-content-center" 
+                                        id="toggleChannelA_${idx}" 
+                                        onclick="setSynthEnabled(${idx}, 'a', ${!synth.enabled.a})">
+                                    <i class="bi bi-power me-1"></i> V
+                                </button>
+                                <button type="button" class="btn p-2 w-50 ${synth.enabled.b ? 'btn-success' : 'btn-danger'} d-flex align-items-center justify-content-center" 
+                                        id="toggleChannelB_${idx}" 
+                                        onclick="setSynthEnabled(${idx}, 'b', ${!synth.enabled.b})">
+                                    <i class="bi bi-power me-1"></i> I
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

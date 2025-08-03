@@ -39,6 +39,8 @@ class SynthStateManager:
         default_data = []
         for i in range(3):
             default_data.append({
+                "auto_on": False,
+                "enabled": { "a": False, "b": False },
                 "amplitude_a": 96.0,
                 "amplitude_b": 50.0,
                 "frequency_a": 50.0,

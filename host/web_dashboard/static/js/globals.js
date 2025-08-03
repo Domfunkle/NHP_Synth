@@ -10,7 +10,8 @@ import { selected, setSelected, clearSelected, incrementSelected, resetSelected 
 // API
 import {
     setSynthAmplitude, setSynthFrequency, setSynthPhase,
-    setSynthHarmonics, synthStateEquals, getDefaults,setSocket
+    setSynthHarmonics, synthStateEquals, getDefaults,
+    setSynthEnabled, setSocket
 } from './api.js';
 
 // Synth Handlers
@@ -50,6 +51,7 @@ window.incrementSelected = incrementSelected;
 window.resetSelected = resetSelected;
 
 // API
+window.setSynthEnabled = setSynthEnabled;
 window.setSynthAmplitude = setSynthAmplitude;
 window.setSynthFrequency = setSynthFrequency;
 window.setSynthPhase = setSynthPhase;

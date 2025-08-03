@@ -58,6 +58,16 @@ function sendSynthCommandWS(socket, synthId, command, channel, value, callback) 
     });
 }
 
+/** * Set enabled state for a synth channel
+ * @param {number} synthId
+ * @param {string} channel - 'a' or 'b'
+ * @param {boolean} enabled - true to enable, false to disable
+ */
+export async function setSynthEnabled(synthId, channel, enabled) {
+    return sendSynthCommandWS(socketInstance, synthId, 'set_enabled', channel, enabled);
+    // return apiPost(`/api/synths/${synthId}/enabled`, { channel, enabled });
+}
+
 /**
  * Set amplitude for a synth channel
  * @param {number} synthId

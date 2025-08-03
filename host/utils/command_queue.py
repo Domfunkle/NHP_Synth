@@ -12,7 +12,10 @@ def process_command_queue(command_queue, synths, state_manager):
             if synth_id is not None and 0 <= synth_id < len(synths):
                 synth = synths[synth_id]
                 synth_state = state_manager.synths[synth_id]
-                if command == 'set_amplitude':
+                if command == 'set_enabled':
+                    synth.set_enabled(channel, value)
+                    synth_state['enabled'][channel] = value
+                elif command == 'set_amplitude':
                     synth.set_amplitude(channel, value)
                     if channel == 'a':
                         synth_state['amplitude_a'] = value
