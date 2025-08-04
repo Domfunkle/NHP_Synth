@@ -76,7 +76,8 @@
                             getHorizontalScale()
                         );
                     }
-                    console.log(AppState);
+                    // Update phase visibility UI to reflect current state
+                    updatePhaseVisibilityUI();
 
                     // Restore selected input group if any
                     if (AppState.selectedId) {

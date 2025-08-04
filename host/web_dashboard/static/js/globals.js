@@ -28,7 +28,9 @@ import {
     AppState, setSynthState, setOpenOffcanvasId, setSelectedId,
     getSynthState, getOpenOffcanvasId, getSelectedId,
     getVoltageScale, getCurrentScale, getHorizontalScale,
-    setVoltageScale, setCurrentScale, setHorizontalScale
+    setVoltageScale, setCurrentScale, setHorizontalScale,
+    setPhaseVisibility, getPhaseVisibility, getAllPhaseVisibility,
+    updatePhaseVisibilityUI
 } from './state.js';
 
 // Utilities
@@ -92,6 +94,10 @@ window.getHorizontalScale = getHorizontalScale;
 window.setVoltageScale = setVoltageScale;
 window.setCurrentScale = setCurrentScale;
 window.setHorizontalScale = setHorizontalScale;
+window.setPhaseVisibility = setPhaseVisibility;
+window.getPhaseVisibility = getPhaseVisibility;
+window.getAllPhaseVisibility = getAllPhaseVisibility;
+window.updatePhaseVisibilityUI = updatePhaseVisibilityUI;
 
 // Utilities
 window.DPF = DPF;

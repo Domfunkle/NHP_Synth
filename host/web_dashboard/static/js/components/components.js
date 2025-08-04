@@ -199,56 +199,59 @@ export function SynthCards(AppState) {
         <div class="card-body p-2 align-items-center">
             <div class="row">
                 <div class="col-10 px-1 text-center">
-                    <canvas class="border rounded mx-2" id="waveform_three_phase" height="200" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                    <div class="row">
+                        <div class="col pe-0">
+                            <canvas class="border rounded mx-2" id="waveform_three_phase" height="200" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                        </div>
+                        <div class="col-auto ps-0">
+                            <ul class="list-group text-start font-monospace">
+                                ${['L1', 'L2', 'L3'].map(phase => 
+                                    ['voltage', 'current'].map(type => {
+                                        const label = type === 'voltage' ? 'V' : 'I';
+                                        return `<li type="button" class="list-group-item py-1 ${getPhaseVisibility(phase, type) ? `text-${phase}-${type}` : 'text-muted'}" id="toggle-phase-${phase}-${type}" onclick="setPhaseVisibility('${phase}', '${type}', !getPhaseVisibility('${phase}', '${type}'))">
+                                    ${phase} ${label}
+                                </li>`;
+                                    }).join('')
+                                ).join('')}
+                            </ul>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-2 px-1 pe-3">
-                    <div class="vstack gap-2">
+                    <div class="vstack gap-2 font-monospace">
                         <div class="hstack gap-0 justify-content-between">
-                            <ul class="list-group">
-                                <li class="list-group-item list-group-item-light text-center py-1">
-                                    <span style="font-style:italic; font-family:Cambria;">V</span>
+                            <ul class="list-group" style="width: 55px;">
+                                <li type="button" class="list-group-item list-group-item-action text-center" id="vertical-scale-voltage-up" onclick="setVoltageScale(getVoltageScale() + 0.1)">
+                                    <span style="white-space:nowrap; font-style:italic; font-family:Cambria;">V<i class="bi bi-plus"></i></span>
                                 </li>
-                                <li type="button" class="list-group-item list-group-item-action text-center py-1" id="vertical-scale-voltage-up" onclick="setVoltageScale(getVoltageScale() + 0.1)">
-                                        <i class="bi bi-plus"></i>
-                                </li>
-                                <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="voltage-scale-display">
+                                <li class="list-group-item list-group-item-light text-center px-1" style="font-size: 0.8em;" id="voltage-scale-display">
                                     ${getVoltageScale().toFixed(1)}x
                                 </li>
-                                <li type="button" class="list-group-item list-group-item-action text-center py-1" id="vertical-scale-voltage-down" onclick="setVoltageScale(getVoltageScale() - 0.1)">
-                                    <i class="bi bi-dash"></i>
+                                <li type="button" class="list-group-item list-group-item-action text-center" id="vertical-scale-voltage-down" onclick="setVoltageScale(getVoltageScale() - 0.1)">
+                                    <span style="white-space: nowrap; font-style:italic; font-family:Cambria;">V<i class="bi bi-dash"></i></span>
                                 </li>
                             </ul>
-                            <ul class="list-group">
-                                <li class="list-group-item list-group-item-light text-center py-1">
-                                    <span style="font-style:italic; font-family:Cambria;">I</span>
+                            <ul class="list-group" style="width: 55px;">
+                                <li type="button" class="list-group-item list-group-item-action" id="vertical-scale-current-up" onclick="setCurrentScale(getCurrentScale() + 0.1)">
+                                    <span style="white-space: nowrap; font-style:italic; font-family:Cambria;">I<i class="bi bi-plus"></i></span>
                                 </li>
-                                <li type="button" class="list-group-item list-group-item-action py-1" id="vertical-scale-current-up" onclick="setCurrentScale(getCurrentScale() + 0.1)">
-                                        <i class="bi bi-plus"></i>
-                                </li>
-                                <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="current-scale-display">
+                                <li class="list-group-item list-group-item-light text-center px-1" style="font-size: 0.8em;" id="current-scale-display">
                                     ${getCurrentScale().toFixed(1)}x
                                 </li>
-                                <li type="button" class="list-group-item list-group-item-action py-1" id="vertical-scale-current-down" onclick="setCurrentScale(getCurrentScale() - 0.1)">
-                                    <i class="bi bi-dash"></i>
+                                <li type="button" class="list-group-item list-group-item-action" id="vertical-scale-current-down" onclick="setCurrentScale(getCurrentScale() - 0.1)">
+                                    <span style="white-space: nowrap; font-style:italic; font-family:Cambria;">I<i class="bi bi-dash"></i></span>
                                 </li>
                             </ul>
                         </div>
-                        <ul class="list-group">
-                            <li class="list-group-item list-group-item-light text-center py-1">
-                                <span>Horiz</span>
+                        <ul class="list-group list-group-horizontal align-items-stretch">
+                            <li type="button" class="list-group-item list-group-item-action text-center px-1 d-flex align-items-center justify-content-center" id="horizontal-scale-down" onclick="setHorizontalScale(getHorizontalScale() - 0.1)">
+                                <span style="white-space: nowrap; font-style:italic; font-family:Cambria;">H<i class="bi bi-dash"></i></span>
                             </li>
-                            <li class="list-group-item list-group-item-light text-center p-0">
-                                <ul class="list-group list-group-horizontal">
-                                    <li type="button" class="list-group-item list-group-item-action text-center border border-0 border-end p-1" id="horizontal-scale-down" onclick="setHorizontalScale(getHorizontalScale() - 0.1)">
-                                        <i class="bi bi-dash"></i>
-                                    </li>
-                                    <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="horizontal-scale-display">
-                                        ${getHorizontalScale().toFixed(1)}x
-                                    </li>
-                                    <li type="button" class="list-group-item list-group-item-action text-center border border-0 border-start p-1" id="horizontal-scale-up" onclick="setHorizontalScale(getHorizontalScale() + 0.1)">
-                                        <i class="bi bi-plus"></i>
-                                    </li>
-                                </ul>
+                            <li class="list-group-item list-group-item-light text-center px-1 d-flex align-items-center justify-content-center" style="font-size: 0.8em;" id="horizontal-scale-display">
+                                ${getHorizontalScale().toFixed(1)}x
+                            </li>
+                            <li type="button" class="list-group-item list-group-item-action text-center px-1 d-flex align-items-center justify-content-center" id="horizontal-scale-up" onclick="setHorizontalScale(getHorizontalScale() + 0.1)">
+                                <span style="white-space: nowrap; font-style:italic; font-family:Cambria;">H<i class="bi bi-plus"></i></span>
                             </li>
                         </ul>
                     </div>

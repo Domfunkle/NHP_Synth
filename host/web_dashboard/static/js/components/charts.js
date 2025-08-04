@@ -113,207 +113,126 @@ export function singlePhaseWaveformChart(synth, canvasId) {
 }
 
 export function threePhaseWaveformChart(synths, canvasId, voltage_scale = 1, current_scale = 1, horizontal_scale = 1) {
-    const synth_L1 = synths[0];
-    const synth_L2 = synths[1];
-    const synth_L3 = synths[2];
-    if (!synth_L1 || !synth_L2 || !synth_L3) return;
+    const phaseLabels = ['L1', 'L2', 'L3'];
+    const phaseSynths = [synths[0], synths[1], synths[2]];
+    
+    if (!phaseSynths[0] || !phaseSynths[1] || !phaseSynths[2]) return;
 
     const sqrt2 = Math.sqrt(2);
-
-    const L1_voltage_amplitude = (synth_L1.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
-    const L2_voltage_amplitude = (synth_L2.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
-    const L3_voltage_amplitude = (synth_L3.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
-
-    const L1_current_amplitude = (synth_L1.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
-    const L2_current_amplitude = (synth_L2.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
-    const L3_current_amplitude = (synth_L3.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
-
-    const L1_voltage_phase = synth_L1.phase_a;
-    const L2_voltage_phase = synth_L2.phase_a;
-    const L3_voltage_phase = synth_L3.phase_a;
-
-    const L1_current_phase = synth_L1.phase_b;
-    const L2_current_phase = synth_L2.phase_b;
-    const L3_current_phase = synth_L3.phase_b;
-
-    const L1_frequency = synth_L1.frequency_a;
+    const frequency = phaseSynths[0].frequency_a;
+    
+    // Calculate amplitudes and phases for all phases using loops
+    const phaseData = phaseLabels.map((label, i) => {
+        const synth = phaseSynths[i];
+        return {
+            label,
+            voltage: {
+                amplitude: (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale,
+                phase: synth.phase_a,
+                harmonics: synth.harmonics_a,
+                visible: getPhaseVisibility(label, 'voltage')
+            },
+            current: {
+                amplitude: (synth.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale,
+                phase: synth.phase_b,
+                harmonics: synth.harmonics_b,
+                visible: getPhaseVisibility(label, 'current')
+            }
+        };
+    });
     
     const cycles = roundToPrecision(2 * horizontal_scale, 2);
     const N = 200;
     const x = Array.from({ length: (N * cycles) }, (_, i) => (i / N) - cycles/2);
     
     function sumHarmonics(t, amplitude, phase, harmonics) {
-        let y = amplitude * Math.sin(2 * Math.PI * L1_frequency/40 * t + (phase * Math.PI / 180));
+        let y = amplitude * Math.sin(2 * Math.PI * frequency/40 * t + (phase * Math.PI / 180));
         if (Array.isArray(harmonics)) {
             harmonics.forEach(h => {
                 const harmAmplitude = amplitude * (h.amplitude / 100);
-                y += harmAmplitude * Math.sin(2 * Math.PI * h.order * L1_frequency/40 * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
+                y += harmAmplitude * Math.sin(2 * Math.PI * h.order * frequency/40 * t + ((h.phase + (h.order * phase)) * Math.PI / 180));
             });
         }
         return y;
     }
-    const y_L1_voltage = x.map(t => sumHarmonics(t, L1_voltage_amplitude, L1_voltage_phase, synth_L1.harmonics_a));
-    const y_L2_voltage = x.map(t => sumHarmonics(t, L2_voltage_amplitude, L2_voltage_phase, synth_L2.harmonics_a));
-    const y_L3_voltage = x.map(t => sumHarmonics(t, L3_voltage_amplitude, L3_voltage_phase, synth_L3.harmonics_a));
-    const y_L1_current = x.map(t => sumHarmonics(t, L1_current_amplitude, L1_current_phase, synth_L1.harmonics_b));
-    const y_L2_current = x.map(t => sumHarmonics(t, L2_current_amplitude, L2_current_phase, synth_L2.harmonics_b));
-    const y_L3_current = x.map(t => sumHarmonics(t, L3_current_amplitude, L3_current_phase, synth_L3.harmonics_b));
+    
+    // Generate waveform data for all phases using loops
+    const waveformData = phaseData.map(phase => ({
+        label: phase.label,
+        voltage: {
+            data: x.map(t => sumHarmonics(t, phase.voltage.amplitude, phase.voltage.phase, phase.voltage.harmonics)),
+            visible: phase.voltage.visible
+        },
+        current: {
+            data: x.map(t => sumHarmonics(t, phase.current.amplitude, phase.current.phase, phase.current.harmonics)),
+            visible: phase.current.visible
+        }
+    }));
 
     const voltageMax = VOLTAGE_RMS_MAX * sqrt2;
     const currentMax = CURRENT_RMS_MAX * sqrt2;
 
+    // Get colors for all phases using loops
     const rootStyles = getComputedStyle(document.documentElement);
-    const phaseColorL1 = rootStyles.getPropertyValue('--L1-voltage-color').trim();
-    const phaseColorL2 = rootStyles.getPropertyValue('--L2-voltage-color').trim();
-    const phaseColorL3 = rootStyles.getPropertyValue('--L3-voltage-color').trim();
-    const currentColorL1 = rootStyles.getPropertyValue('--L1-current-color').trim();
-    const currentColorL2 = rootStyles.getPropertyValue('--L2-current-color').trim();
-    const currentColorL3 = rootStyles.getPropertyValue('--L3-current-color').trim();
+    const colors = phaseLabels.reduce((acc, label) => {
+        acc[label] = {
+            voltage: rootStyles.getPropertyValue(`--${label}-voltage-color`).trim(),
+            current: rootStyles.getPropertyValue(`--${label}-current-color`).trim()
+        };
+        return acc;
+    }, {});
 
     const ctx = document.getElementById(canvasId)?.getContext('2d');
     if (!ctx) return;
     if (window[canvasId + '_chart']) {
         window[canvasId + '_chart'].destroy();
     }
+
+    // Generate datasets using loops
+    const datasets = [];
+    
+    waveformData.forEach((phase, i) => {
+        // Add voltage dataset
+        datasets.push({
+            label: `${phase.label} Voltage`,
+            data: phase.voltage.data,
+            borderColor: colors[phase.label].voltage,
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.2,
+            yAxisID: 'yV',
+            order: (i + 1) * 2, // 2, 4, 6 for L1, L2, L3 voltage
+            hidden: !phase.voltage.visible
+        });
+        
+        // Add current dataset
+        datasets.push({
+            label: `${phase.label} Current`,
+            data: phase.current.data,
+            borderColor: colors[phase.label].current,
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.2,
+            yAxisID: 'yI',
+            order: (i + 1) * 2 - 1, // 1, 3, 5 for L1, L2, L3 current
+            hidden: !phase.current.visible
+        });
+    });
+
     window[canvasId + '_chart'] = new Chart(ctx, {
         type: 'line',
         data: {
             labels: x.map(t => (t * 180).toFixed(0)),
-            datasets: [
-                {
-                    label: 'L1 Voltage',
-                    data: y_L1_voltage,
-                    borderColor: phaseColorL1,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yV',
-                    order: 2
-                },
-                {
-                    label: 'L2 Voltage',
-                    data: y_L2_voltage,
-                    borderColor: phaseColorL2,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yV',
-                    order: 4
-                },
-                {
-                    label: 'L3 Voltage',
-                    data: y_L3_voltage,
-                    borderColor: phaseColorL3,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yV',
-                    order: 6
-                },
-                {
-                    label: 'L1 Current',
-                    data: y_L1_current,
-                    borderColor: currentColorL1,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yI',
-                    order: 1
-                },
-                {
-                    label: 'L2 Current',
-                    data: y_L2_current,
-                    borderColor: currentColorL2,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yI',
-                    order: 3
-                },
-                {
-                    label: 'L3 Current',
-                    data: y_L3_current,
-                    borderColor: currentColorL3,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: false,
-                    tension: 0.2,
-                    yAxisID: 'yI',
-                    order: 5
-                }
-            ]
+            datasets: datasets
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
             plugins: {
-                legend: {
-                    display: true,
-                    position: 'right',
-                    reverse: false,
-                    fullSize: true,
-                    labels: {
-                        color: 'white',
-                        usePointStyle: true,
-                        pointStyle: 'line',
-                        padding: 8,
-                        generateLabels: function(chart) {
-                            const datasets = chart.data.datasets;
-                            const groupedLabels = [];
-                            
-                            // Group by phase (L1, L2, L3)
-                            const phases = ['L1', 'L2', 'L3'];
-                            phases.forEach(phase => {
-                                const voltageDataset = datasets.find(d => d.label === `${phase} Voltage`);
-                                const currentDataset = datasets.find(d => d.label === `${phase} Current`);
-                                
-                                if (voltageDataset) {
-                                    groupedLabels.push({
-                                        text: `${phase} Voltage`,
-                                        fillStyle: voltageDataset.borderColor,
-                                        strokeStyle: voltageDataset.borderColor,
-                                        fontColor: 'white',
-                                        lineWidth: 2,
-                                        pointStyle: 'line',
-                                        datasetIndex: datasets.indexOf(voltageDataset)
-                                    });
-                                }
-                                if (currentDataset) {
-                                    groupedLabels.push({
-                                        text: `${phase} Current`,
-                                        fillStyle: currentDataset.borderColor,
-                                        strokeStyle: currentDataset.borderColor,
-                                        fontColor: 'white',
-                                        lineWidth: 2,
-                                        pointStyle: 'line',
-                                        datasetIndex: datasets.indexOf(currentDataset)
-                                    });
-                                }
-                                
-                                // Add spacing between phases
-                                if (phase !== 'L3') {
-                                    groupedLabels.push({
-                                        text: '',
-                                        fillStyle: 'transparent',
-                                        strokeStyle: 'transparent',
-                                        fontColor: 'white',
-                                        lineWidth: 0,
-                                        pointStyle: 'line',
-                                        datasetIndex: -1
-                                    });
-                                }
-                            });
-                            
-                            return groupedLabels;
-                        }
-                    }
-                },
+                legend: { display: false },
                 tooltip: { enabled: false }
             },
             scales: {
