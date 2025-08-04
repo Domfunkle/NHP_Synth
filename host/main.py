@@ -54,7 +54,8 @@ def main():
         # Start Flask-SocketIO app in a background thread
         flask_app, socketio = create_app(command_queue, state)
         def run_socketio():
-            socketio.run(flask_app, host='0.0.0.0', port=5000)
+            # Use threaded=True and allow_unsafe_werkzeug=True to prevent runtime error
+            socketio.run(flask_app, host='0.0.0.0', port=5000, debug=False, use_reloader=False, allow_unsafe_werkzeug=True)
         flask_thread = threading.Thread(target=run_socketio, daemon=True)
         flask_thread.start()
         logger.info("Flask-SocketIO dashboard server started on port 5000.")

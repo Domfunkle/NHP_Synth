@@ -14,7 +14,12 @@ class SynthStateManager:
         self.selection_mode = None
 
         self.defaults = copy.deepcopy(self.load_defaults())
-        self.synths = copy.deepcopy(self.load_state()).get("synths", [])
+        loaded_state = self.load_state()
+        if isinstance(loaded_state, dict):
+            self.synths = loaded_state.get("synths", [])
+        else:
+            # load_state returned the defaults list directly
+            self.synths = loaded_state
 
     def get_defaults(self, idx, key):
         if idx < len(self.defaults):

@@ -65,6 +65,7 @@ flasher_args.json
 *.rar
 .lgd-nfy0
 host/config/
+*.pid
 
 # Archive and backup
 *~

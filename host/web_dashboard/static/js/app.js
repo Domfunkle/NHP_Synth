@@ -97,20 +97,26 @@ export class SynthApp {
 
     // Setup DOM event listeners
     setupDOMListeners() {
-        document.addEventListener('DOMContentLoaded', () => {
-            // Use immediate render for initial page load
+        // Setup fullscreen handler immediately if DOM is ready, or wait for it
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.renderImmediate();
+                this.setupFullscreenHandler();
+                setupSettingsListeners();
+            });
+        } else {
+            // DOM is already ready
             this.renderImmediate();
             this.setupFullscreenHandler();
-            // Setup settings listeners after DOM is ready
             setupSettingsListeners();
-        });
+        }
     }
 
     // Setup fullscreen functionality
     setupFullscreenHandler() {
         const fsBtn = document.getElementById('fullscreen-btn');
         if (fsBtn) {
-            fsBtn.addEventListener('click', this.toggleFullscreen);
+            fsBtn.addEventListener('click', this.toggleFullscreen.bind(this));
         }
 
         // Update fullscreen icon when state changes
