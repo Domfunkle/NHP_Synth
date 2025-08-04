@@ -12,7 +12,7 @@ export function singlePhaseWaveformChart(synth, canvasId) {
     const peakAmplitudeB = sqrt2 * scaledAmplitudeB;
     const cycles = 2;
     const N = 200;
-    const x = Array.from({ length: (N * cycles) }, (_, i) => i / N);
+    const x = Array.from({ length: (N * cycles) }, (_, i) => (i / N) - cycles/2);
     function sumHarmonics(t, peak, phase, harmonics) {
         let y = peak * Math.sin(2 * Math.PI * frequencyA/40 * t + (phase * Math.PI / 180));
         if (Array.isArray(harmonics)) {
@@ -69,6 +69,7 @@ export function singlePhaseWaveformChart(synth, canvasId) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             animation: false,
             plugins: {
                 legend: {
@@ -139,7 +140,7 @@ export function threePhaseWaveformChart(synths, canvasId) {
     
     const cycles = 2;
     const N = 200;
-    const x = Array.from({ length: (N * cycles) }, (_, i) => i / N);
+    const x = Array.from({ length: (N * cycles) }, (_, i) => (i / N) - cycles/2);
 
     function sumHarmonics(t, amplitude, phase, harmonics) {
         let y = amplitude * Math.sin(2 * Math.PI * L1_frequency/40 * t + (phase * Math.PI / 180));
@@ -249,6 +250,7 @@ export function threePhaseWaveformChart(synths, canvasId) {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             animation: false,
             plugins: {
                 legend: {
