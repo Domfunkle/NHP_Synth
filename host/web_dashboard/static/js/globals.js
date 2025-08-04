@@ -1,114 +1,142 @@
-// globals.js - Assigns all needed functions to window for inline event handlers
+// globals.js - Global window assignments for inline event handlers and dynamic components
+// NOTE: This file is required because components.js generates HTML with inline onclick handlers
+// and state.js calls chart functions dynamically. Future refactoring could eliminate this
+// by using event delegation and direct imports.
 
 // Components
 import { SynthCards } from './components/components.js';
 import { singlePhaseWaveformChart, threePhaseWaveformChart } from './components/charts.js';
 import { vectorChart } from './components/vectorChart.js';
 import { incrementButtons } from './components/incrementButtons.js';
-import { selected, setSelected, clearSelected, incrementSelected, resetSelected } from './components/selection.js';
+import { setSelected, clearSelected, selected, incrementSelected, resetSelected } from './components/selection.js';
 
 // API
-import {
-    setSynthAmplitude, setSynthFrequency, setSynthPhase,
-    setSynthHarmonics, synthStateEquals, getDefaults,
-    setSynthEnabled, setSocket
+import { 
+    setSynthEnabled, setSocket, setSynthAmplitude, setSynthFrequency, setSynthPhase,
+    getDefaults, setSynthHarmonics
 } from './api.js';
 
-// Synth Handlers
-import { 
-    incrementVoltage, setVoltageDirect, resetVoltage, 
-    incrementCurrent, resetCurrent, setCurrentDirect,
-    incrementPhase, setPhaseDirect, resetPhase,
-    incrementFrequency, setFrequencyDirect, resetFrequency,
+// Settings Management
+import {
+    initializeSettings, getSettings, getSetting, setSetting, updateSettings,
+    resetSettings, saveSettingsToServer, setupSettingsListeners,
+    getMaxVoltage, getMaxCurrent, isDebugMode, getChartRefreshRate, getPrecisionDigits,
+    getSynthAutoOn, getSynthAutoOnForIndex
+} from './settings.js';
+
+// Synth Handlers (used in onblur/onkeydown attributes)
+import {
+    setVoltageDirect, setCurrentDirect, setPhaseDirect, setFrequencyDirect,
+    incrementVoltage, incrementCurrent, incrementPhase, incrementFrequency,
+    resetVoltage, resetCurrent, resetPhase, resetFrequency,
     incrementHarmonic, resetHarmonic
 } from './components/synthHandlers.js';
 
-// State Management
+// State Management  
 import {
-    AppState, setSynthState, setOpenOffcanvasId, setSelectedId,
-    getSynthState, getOpenOffcanvasId, getSelectedId,
+    AppState, setOpenOffcanvasId, setSelectedId,
+    getOpenOffcanvasId, getSelectedId, getSynthState,
     getVoltageScale, getCurrentScale, getHorizontalScale,
     setVoltageScale, setCurrentScale, setHorizontalScale,
-    setPhaseVisibility, getPhaseVisibility, getAllPhaseVisibility,
+    setPhaseVisibility, getPhaseVisibility,
     updatePhaseVisibilityUI
 } from './state.js';
 
-// Utilities
+// Utilities (used in component templates)
 import {
-    DPF, THD, truePF, getGlobalFrequencyHz, LoadingSpinner,
-    trueRMS, apparentPower, reactivePower, activePower, roundToPrecision,
-    VOLTAGE_RMS_MAX, CURRENT_RMS_MAX
+    roundToPrecision, apparentPower, reactivePower, activePower,
+    VOLTAGE_RMS_MAX, CURRENT_RMS_MAX, THD, DPF, truePF, debounce,
+    throttle, formatValue, clamp
 } from './utils.js';
 
-// Components
+// === COMPONENT FUNCTIONS (used in generated HTML) ===
 window.SynthCards = SynthCards;
 window.singlePhaseWaveformChart = singlePhaseWaveformChart;
 window.threePhaseWaveformChart = threePhaseWaveformChart;
 window.vectorChart = vectorChart;
 window.incrementButtons = incrementButtons;
 
-// Selection
-window.selected = selected;
+// === SELECTION HANDLERS (used in onclick attributes) ===
 window.setSelected = setSelected;
 window.clearSelected = clearSelected;
+window.selected = selected;
 window.incrementSelected = incrementSelected;
 window.resetSelected = resetSelected;
 
-// API
+// === API FUNCTIONS (used in onclick attributes) ===
 window.setSynthEnabled = setSynthEnabled;
+window.setSocket = setSocket;
 window.setSynthAmplitude = setSynthAmplitude;
 window.setSynthFrequency = setSynthFrequency;
 window.setSynthPhase = setSynthPhase;
-window.setSynthHarmonics = setSynthHarmonics;
-window.synthStateEquals = synthStateEquals;
 window.getDefaults = getDefaults;
-window.setSocket = setSocket;
+window.setSynthHarmonics = setSynthHarmonics;
 
-// Synth Handlers
-window.incrementVoltage = incrementVoltage;
+// === SYNTH HANDLERS (used in onblur/onkeydown attributes) ===
 window.setVoltageDirect = setVoltageDirect;
-window.resetVoltage = resetVoltage;
-window.incrementCurrent = incrementCurrent;
-window.resetCurrent = resetCurrent;
 window.setCurrentDirect = setCurrentDirect;
-window.incrementPhase = incrementPhase;
 window.setPhaseDirect = setPhaseDirect;
-window.resetPhase = resetPhase;
-window.incrementFrequency = incrementFrequency;
 window.setFrequencyDirect = setFrequencyDirect;
+window.incrementVoltage = incrementVoltage;
+window.incrementCurrent = incrementCurrent;
+window.incrementPhase = incrementPhase;
+window.incrementFrequency = incrementFrequency;
+window.resetVoltage = resetVoltage;
+window.resetCurrent = resetCurrent;
+window.resetPhase = resetPhase;
 window.resetFrequency = resetFrequency;
 window.incrementHarmonic = incrementHarmonic;
 window.resetHarmonic = resetHarmonic;
 
-// State Management
+// === STATE MANAGEMENT (used in onclick attributes and dynamic calls) ===
 window.AppState = AppState;
-window.setSynthState = setSynthState;
 window.setOpenOffcanvasId = setOpenOffcanvasId;
 window.setSelectedId = setSelectedId;
-window.getSynthState = getSynthState;
 window.getOpenOffcanvasId = getOpenOffcanvasId;
 window.getSelectedId = getSelectedId;
+window.getSynthState = getSynthState;
+
+// === CHART SCALING (used in onclick attributes) ===
 window.getVoltageScale = getVoltageScale;
 window.getCurrentScale = getCurrentScale;
 window.getHorizontalScale = getHorizontalScale;
 window.setVoltageScale = setVoltageScale;
 window.setCurrentScale = setCurrentScale;
 window.setHorizontalScale = setHorizontalScale;
+
+// === PHASE VISIBILITY (used in onclick attributes) ===
 window.setPhaseVisibility = setPhaseVisibility;
 window.getPhaseVisibility = getPhaseVisibility;
-window.getAllPhaseVisibility = getAllPhaseVisibility;
 window.updatePhaseVisibilityUI = updatePhaseVisibilityUI;
 
-// Utilities
-window.DPF = DPF;
-window.THD = THD;
-window.truePF = truePF;
-window.trueRMS = trueRMS;
+// === UTILITY FUNCTIONS (used in component templates) ===
+window.roundToPrecision = roundToPrecision;
 window.apparentPower = apparentPower;
 window.reactivePower = reactivePower;
 window.activePower = activePower;
-window.getGlobalFrequencyHz = getGlobalFrequencyHz;
-window.LoadingSpinner = LoadingSpinner;
-window.roundToPrecision = roundToPrecision;
 window.VOLTAGE_RMS_MAX = VOLTAGE_RMS_MAX;
 window.CURRENT_RMS_MAX = CURRENT_RMS_MAX;
+window.THD = THD;
+window.DPF = DPF;
+window.truePF = truePF;
+window.debounce = debounce;
+window.throttle = throttle;
+window.formatValue = formatValue;
+window.clamp = clamp;
+
+// === SETTINGS MANAGEMENT (used in onclick attributes and dynamic calls) ===
+window.initializeSettings = initializeSettings;
+window.getSettings = getSettings;
+window.getSetting = getSetting;
+window.setSetting = setSetting;
+window.updateSettings = updateSettings;
+window.resetSettings = resetSettings;
+window.saveSettings = saveSettingsToServer;
+window.setupSettingsListeners = setupSettingsListeners;
+window.getMaxVoltage = getMaxVoltage;
+window.getMaxCurrent = getMaxCurrent;
+window.isDebugMode = isDebugMode;
+window.getChartRefreshRate = getChartRefreshRate;
+window.getPrecisionDigits = getPrecisionDigits;
+window.getSynthAutoOn = getSynthAutoOn;
+window.getSynthAutoOnForIndex = getSynthAutoOnForIndex;

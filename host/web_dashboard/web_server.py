@@ -22,7 +22,7 @@ def create_app(command_queue, state_manager):
             return jsonify({'error': str(e)}), 500
 
     def queue_command(command_dict):
-        command_dict['timestamp'] = datetime.datetime.utcnow().isoformat()
+        command_dict['timestamp'] = datetime.datetime.now().isoformat()
         command_queue.put(command_dict)
         return {'status': 'queued', 'command': command_dict}
 
@@ -150,6 +150,110 @@ def create_app(command_queue, state_manager):
             state_manager.defaults = defaults
             state_manager.save_state()  # Save the new defaults to file
             return jsonify({'status': 'Defaults updated'})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    # Settings management endpoints
+    @app.route('/api/settings', methods=['GET'])
+    def get_settings():
+        try:
+            settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                
+                # Sync synthAutoOn with current synth state if available
+                if hasattr(state_manager, 'synths') and len(state_manager.synths) >= 3:
+                    settings['synthAutoOn'] = [
+                        synth.get('auto_on', False) for synth in state_manager.synths[:3]
+                    ]
+            else:
+                # Default settings
+                settings = {
+                    'maxVoltage': 250,
+                    'maxCurrent': 10,
+                    'chartRefreshRate': 100,
+                    'precisionDigits': 2,
+                    'autoSaveSettings': True,
+                    'debugMode': False,
+                    'synthAutoOn': [False, False, False]  # Default auto_on for 3 synths
+                }
+                # Save default settings
+                with open(settings_file, 'w') as f:
+                    json.dump(settings, f, indent=2)
+            return jsonify(settings)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/settings', methods=['POST'])
+    def save_settings():
+        try:
+            settings = request.json
+            settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+            
+            # Validate settings
+            if not isinstance(settings.get('maxVoltage'), (int, float)) or settings['maxVoltage'] <= 0:
+                return jsonify({'error': 'Invalid maxVoltage'}), 400
+            if not isinstance(settings.get('maxCurrent'), (int, float)) or settings['maxCurrent'] <= 0:
+                return jsonify({'error': 'Invalid maxCurrent'}), 400
+            if settings.get('chartRefreshRate') not in [50, 100, 200, 500]:
+                return jsonify({'error': 'Invalid chartRefreshRate'}), 400
+            if settings.get('precisionDigits') not in [1, 2, 3, 4]:
+                return jsonify({'error': 'Invalid precisionDigits'}), 400
+            if not isinstance(settings.get('autoSaveSettings'), bool):
+                return jsonify({'error': 'Invalid autoSaveSettings'}), 400
+            if not isinstance(settings.get('debugMode'), bool):
+                return jsonify({'error': 'Invalid debugMode'}), 400
+            if not isinstance(settings.get('synthAutoOn'), list) or len(settings['synthAutoOn']) != 3:
+                return jsonify({'error': 'Invalid synthAutoOn'}), 400
+            if not all(isinstance(x, bool) for x in settings['synthAutoOn']):
+                return jsonify({'error': 'Invalid synthAutoOn values'}), 400
+            
+            # Add timestamp
+            settings['lastSaved'] = datetime.datetime.now().isoformat()
+            
+            # Save to file
+            with open(settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
+            # Update synth state manager with new auto_on settings
+            if hasattr(state_manager, 'synths') and settings.get('synthAutoOn'):
+                for i, auto_on in enumerate(settings['synthAutoOn']):
+                    if i < len(state_manager.synths):
+                        state_manager.synths[i]['auto_on'] = auto_on
+                state_manager.save_state()  # Save updated synth state
+            
+            return jsonify({'status': 'Settings saved', 'settings': settings})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/settings/reset', methods=['POST'])
+    def reset_settings():
+        try:
+            # Default settings
+            settings = {
+                'maxVoltage': 250,
+                'maxCurrent': 10,
+                'chartRefreshRate': 100,
+                'precisionDigits': 2,
+                'autoSaveSettings': True,
+                'debugMode': False,
+                'synthAutoOn': [False, False, False],
+                'lastSaved': datetime.datetime.now().isoformat()
+            }
+            
+            settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+            
+            with open(settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
+            return jsonify({'status': 'Settings reset', 'settings': settings})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 

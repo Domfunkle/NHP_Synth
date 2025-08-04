@@ -1,6 +1,8 @@
 // UI Component and rendering functions for NHP Synth Dashboard
 // Exported as ES module
 
+import { getMaxVoltage, getMaxCurrent } from '../settings.js';
+
 // listener for offcanvas close events
 document.addEventListener('hidden.bs.offcanvas', function(event) {
     window.clearSelected();
@@ -9,8 +11,10 @@ document.addEventListener('hidden.bs.offcanvas', function(event) {
 function synthCardItem({ synth, idx, phaseLabel }, AppState) {
     const phase = phaseLabel || `L${idx + 1}`;
     const singlePhaseChartCanvasId = `waveform_single_phase_${idx}`;
-    const scaledAmplitudeA = roundToPrecision((synth.amplitude_a / 100) * VOLTAGE_RMS_MAX, 1);
-    const scaledAmplitudeB = roundToPrecision((synth.amplitude_b / 100) * CURRENT_RMS_MAX, 2);
+    const VOLTAGE_MAX = getMaxVoltage();
+    const CURRENT_MAX = getMaxCurrent();
+    const scaledAmplitudeA = roundToPrecision((synth.amplitude_a / 100) * VOLTAGE_MAX, 1);
+    const scaledAmplitudeB = roundToPrecision((synth.amplitude_b / 100) * CURRENT_MAX, 2);
     const offcanvasId = (type) => `offcanvas_${type}_${idx}`;
 
     let selectionMode = (AppState.synthState.selectionMode) ? AppState.synthState.selectionMode : {};
@@ -51,11 +55,11 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                 <div style="white-space:pre">PF   ${Math.abs(truePF(synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3).padStart(5,' ')}</div>
             </div>
             <div class="col px-2  text-center" style="border-left: 1px solid gray;">
-                <div style="white-space:pre">S ${(0.001 * apparentPower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100))).toFixed(3) + (" kVA").padEnd(5,' ')}</div>
-                <div>Q ${(0.001 * reactivePower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kVAr").padEnd(5,' ')}</div>
+                <div style="white-space:pre">S ${(0.001 * apparentPower(synth.amplitude_a * (VOLTAGE_MAX/100), synth.amplitude_b * (CURRENT_MAX/100))).toFixed(3) + (" kVA").padEnd(5,' ')}</div>
+                <div>Q ${(0.001 * reactivePower(synth.amplitude_a * (VOLTAGE_MAX/100), synth.amplitude_b * (CURRENT_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kVAr").padEnd(5,' ')}</div>
             </div>
             <div class="col px-2  text-center" style="border-left: 1px solid gray;">
-                <div style="white-space:pre">P ${(0.001 * activePower(synth.amplitude_a * (VOLTAGE_RMS_MAX/100), synth.amplitude_b * (CURRENT_RMS_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kW").padEnd(5,' ')}</div>
+                <div style="white-space:pre">P ${(0.001 * activePower(synth.amplitude_a * (VOLTAGE_MAX/100), synth.amplitude_b * (CURRENT_MAX/100), synth.phase_a, synth.phase_b, synth.harmonics_b)).toFixed(3) + (" kW").padEnd(5,' ')}</div>
             </div>
         </div>
         `;

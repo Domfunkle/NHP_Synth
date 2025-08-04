@@ -1,6 +1,8 @@
 // synthHandlers.js
 // All event handler functions for synth controls
 
+import { getMaxVoltage, getMaxCurrent } from '../settings.js';
+
 export async function setEnabled(idx, channel, enabled) {
     try {
         const synthState = getSynthState();
@@ -17,9 +19,10 @@ export async function incrementVoltage(idx, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        let value = (synth.amplitude_a / 100) * VOLTAGE_RMS_MAX + delta;
-        value = Math.max(0, Math.min(VOLTAGE_RMS_MAX, value));
-        const percent = roundToPrecision(value / VOLTAGE_RMS_MAX * 100, 2);
+        const VOLTAGE_MAX = getMaxVoltage();
+        let value = (synth.amplitude_a / 100) * VOLTAGE_MAX + delta;
+        value = Math.max(0, Math.min(VOLTAGE_MAX, value));
+        const percent = roundToPrecision(value / VOLTAGE_MAX * 100, 2);
         await setSynthAmplitude(synth.id, 'a', percent);
     } catch (error) {
         console.error('incrementVoltage: error incrementing voltage', error);
@@ -30,10 +33,11 @@ export async function setVoltageDirect(idx, value) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
+        const VOLTAGE_MAX = getMaxVoltage();
         let v = parseFloat(value);
         if (isNaN(v)) return;
-        v = Math.max(0, Math.min(VOLTAGE_RMS_MAX, v));
-        const percent = roundToPrecision(v / VOLTAGE_RMS_MAX * 100, 2);
+        v = Math.max(0, Math.min(VOLTAGE_MAX, v));
+        const percent = roundToPrecision(v / VOLTAGE_MAX * 100, 2);
         await setSynthAmplitude(synth.id, 'a', percent);
     } catch (error) {
         console.error('setVoltageDirect: error setting voltage', error);
@@ -54,9 +58,10 @@ export async function incrementCurrent(idx, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        let value = (synth.amplitude_b / 100) * CURRENT_RMS_MAX + delta;
-        value = Math.max(0, Math.min(CURRENT_RMS_MAX, value));
-        const percent = +(value / CURRENT_RMS_MAX * 100).toFixed(2);
+        const CURRENT_MAX = getMaxCurrent();
+        let value = (synth.amplitude_b / 100) * CURRENT_MAX + delta;
+        value = Math.max(0, Math.min(CURRENT_MAX, value));
+        const percent = +(value / CURRENT_MAX * 100).toFixed(2);
         await setSynthAmplitude(synth.id, 'b', percent);
     } catch (error) {
         console.error('incrementCurrent: error incrementing current', error);
@@ -67,10 +72,11 @@ export async function setCurrentDirect(idx, value) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
+        const CURRENT_MAX = getMaxCurrent();
         let v = parseFloat(value);
         if (isNaN(v)) return;
-        v = Math.max(0, Math.min(CURRENT_RMS_MAX, v));
-        const percent = +(v / CURRENT_RMS_MAX * 100).toFixed(2);
+        v = Math.max(0, Math.min(CURRENT_MAX, v));
+        const percent = +(v / CURRENT_MAX * 100).toFixed(2);
         await setSynthAmplitude(synth.id, 'b', percent);
     } catch (error) {
         console.error('setCurrentDirect: error setting current', error);
@@ -253,6 +259,19 @@ export async function resetHarmonic(idx, channel, id, property) {
                 phase: 0
             };
         }
+
+        // If harmonic doesn't exist in current state, create it with current defaults
+        if (!harmonic) {
+            const value = {
+                id,
+                order: defaultHarmonic.order,
+                amplitude: defaultHarmonic.amplitude,
+                phase: defaultHarmonic.phase
+            };
+            await setSynthHarmonics(synth.id, channel, value);
+            return;
+        }
+
         const value = {
             id,
             order: property === 'order' ? defaultHarmonic.order : harmonic.order,

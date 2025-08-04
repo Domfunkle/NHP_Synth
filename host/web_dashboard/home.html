@@ -16,201 +16,11 @@
 <body>
     <script type="module" src="static/js/globals.js"></script>
     <script type="module">
-
-        // --- Offcanvas State Persistence ---
-        setOpenOffcanvasId(null);
-        setSelectedId(null);
-
-        // Listen for offcanvas open/close events
-        function setupStateListeners() {
-            // Offcanvas listeners
-            document.querySelectorAll('.offcanvas').forEach(offcanvas => {
-                offcanvas.addEventListener('show.bs.offcanvas', function () {
-                    setOpenOffcanvasId(this.id);
-                });
-                offcanvas.addEventListener('hide.bs.offcanvas', function () {
-                    if (getOpenOffcanvasId() === this.id) {
-                        setOpenOffcanvasId(null);
-                    }
-                });
-            });
-
-            // Input group selection listeners
-            document.querySelectorAll('.selectable').forEach(element => {
-                element.addEventListener('click', function () {
-                    const currentId = getSelectedId();
-                    if (currentId === this.id) {
-                        setSelectedId(null); // Deselect if already selected
-                    } else {
-                        setSelectedId(this.id); // Select this group
-                        // Deselect other groups
-                        document.querySelectorAll('.selectable').forEach(otherSelectable => {
-                            if (otherSelectable !== this) {
-                                otherSelectable.classList.remove('selected');
-                            }
-                        });
-                        this.classList.add('selected');
-                    }
-                });
-            });
-        }
-
-        // --- Render Logic ---
-        function render() {
-            // Synth cards
-            const cardsContainer = document.getElementById('synth-cards');
-            if (cardsContainer) {
-                if (AppState.synthState && AppState.synthState.synths) {
-                    cardsContainer.innerHTML = SynthCards(AppState);
-                    // After DOM update, render combined waveforms for each synth
-                    AppState.synthState.synths.forEach((synth, idx) => {
-                        singlePhaseWaveformChart(synth, `waveform_single_phase_${idx}`);
-                    });
-                    // Render the single three-phase waveform (requires all synths)
-                    if (AppState.synthState.synths.length >= 3) {
-                        threePhaseWaveformChart(
-                            AppState.synthState.synths,
-                            `waveform_three_phase`,
-                            getVoltageScale(),
-                            getCurrentScale(),
-                            getHorizontalScale()
-                        );
-                    }
-                    // Update phase visibility UI to reflect current state
-                    updatePhaseVisibilityUI();
-
-                    // Restore selected input group if any
-                    if (AppState.selectedId) {
-                        const selectedId = document.getElementById(AppState.selectedId);
-                        if (selectedId) {
-                            selectedId.classList.add('selected');
-                        }
-                    }
-
-                    // Restore open offcanvas if any, but only disable animation for this restoration
-                    if (AppState.openOffcanvasId) {
-                        const offcanvasElem = document.getElementById(AppState.openOffcanvasId);
-                        if (offcanvasElem && !offcanvasElem.classList.contains('show')) {
-                            // Temporarily disable transition for this element
-                            const prevTransition = offcanvasElem.style.transition;
-                            offcanvasElem.style.transition = 'none';
-                            // Use Bootstrap's Offcanvas API to show
-                            const bsOffcanvas = bootstrap.Offcanvas.getOrCreateInstance(offcanvasElem);
-                            bsOffcanvas.show();
-                            // Force reflow to apply the class immediately
-                            void offcanvasElem.offsetWidth;
-                            // Restore transition after a short delay
-                            setTimeout(() => {
-                                offcanvasElem.style.transition = prevTransition;
-                            }, 10);
-                        }
-                    }
-
-                    setupStateListeners();
-                } else {
-                    cardsContainer.innerHTML = LoadingSpinner();
-                }
-            }
-        }
-
-        // --- Socket.IO and Event Logic ---
-        const socket = io();
-        setSocket(socket);
-        
-        // Connection status indicator
-        function updateConnectionStatus(connected) {
-            const statusElement = document.getElementById('connection-status');
-            const iconElement = document.getElementById('connection-icon');
-            if (statusElement && iconElement) {
-                if (connected) {
-                    iconElement.className = 'bi bi-ethernet text-success fs-4';
-                    statusElement.title = 'Socket Connected';
-                } else {
-                    iconElement.className = 'bi bi-ethernet text-danger fs-4';
-                    statusElement.title = 'Socket Disconnected';
-                }
-            }
-        }
-        
-        // Socket connection event handlers
-        socket.on('connect', function() {
-            console.log('Socket connected');
-            updateConnectionStatus(true);
+        import { SynthApp } from './static/js/app.js';
+        const app = new SynthApp();
+        app.init().catch(error => {
+            console.error('Failed to initialize app:', error);
         });
-        
-        socket.on('disconnect', function() {
-            console.log('Socket disconnected');
-            updateConnectionStatus(false);
-        });
-        
-        socket.on('connect_error', function(error) {
-            console.log('Socket connection error:', error);
-            updateConnectionStatus(false);
-        });
-        
-        socket.on('synthState', function (data) {
-            if (!synthStateEquals(AppState.synthState, data)) {
-                // Assign synthetic id if missing
-                if (data && Array.isArray(data.synths)) {
-                    data.synths.forEach((synth, idx) => {
-                        if (typeof synth.id === 'undefined') {
-                            synth.id = idx;
-                        }
-                    });
-                }
-                AppState.synthState = data;
-                render();
-            }
-        });
-
-        document.addEventListener('DOMContentLoaded', function () {
-            render();
-            const fsBtn = document.getElementById('fullscreen-btn');
-            if (fsBtn) {
-                fsBtn.addEventListener('click', toggleFullscreen);
-            }
-            // Optionally update icon/text on fullscreen change
-            function updateFullscreenIcon() {
-                const icon = document.getElementById('fullscreen-icon');
-                if (!icon) return;
-                if (document.fullscreenElement) {
-                    icon.innerHTML = '<span class="bi bi-fullscreen-exit"></span>'; // Exit fullscreen icon
-                } else {
-                    icon.innerHTML = '<span class="bi bi-fullscreen"></span>'; // Fullscreen icon
-                }
-            }
-            document.addEventListener('fullscreenchange', updateFullscreenIcon);
-            document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
-            document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
-            document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
-        });
-
-        // --- Fullscreen Toggle Logic ---
-        function toggleFullscreen() {
-            const doc = window.document;
-            const docEl = doc.documentElement;
-            if (!doc.fullscreenElement && !doc.webkitFullscreenElement && !doc.mozFullScreenElement && !doc.msFullscreenElement) {
-                if (docEl.requestFullscreen) {
-                    docEl.requestFullscreen();
-                } else if (docEl.mozRequestFullScreen) {
-                    docEl.mozRequestFullScreen();
-                } else if (docEl.webkitRequestFullscreen) {
-                    docEl.webkitRequestFullscreen();
-                } else if (docEl.msRequestFullscreen) {
-                    docEl.msRequestFullscreen();
-                }
-            } else {
-                if (doc.exitFullscreen) {
-                    doc.exitFullscreen();
-                } else if (doc.mozCancelFullScreen) {
-                    doc.mozCancelFullScreen();
-                } else if (doc.webkitExitFullscreen) {
-                    doc.webkitExitFullscreen();
-                } else if (doc.msExitFullscreen) {
-                    doc.msExitFullscreen();
-                }
-            }
-        }
     </script>
     <div class="d-flex justify-content-center align-items-center min-vh-100">
         <div class="container-fluid bg-secondary rounded shadow overflow-hidden" style="width:800px; height:480px;">
@@ -237,7 +47,7 @@
                             title="Force Refresh">
                             <span class="bi bi-arrow-clockwise"></span>
                         </button>
-                        <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen">
+                        <button class="btn btn-sm btn-outline-light" id="fullscreen-btn" title="Toggle Fullscreen (F)">
                             <span id="fullscreen-icon"><span class="bi bi-fullscreen"></span></span>
                         </button>
                         <span class="fs-5" id="connection-status" title="Socket Connection Status">
@@ -257,11 +67,154 @@
                         </div>
                         <div class="tab-pane fade" id="settings-pane" role="tabpanel" 
                             aria-labelledby="settings-tab" tabindex="0">
-                            <div class="d-flex justify-content-center align-items-center">
-                                <div class="text-center text-muted">
-                                    <i class="bi bi-gear-fill display-4 mb-3"></i>
-                                    <h5>Settings Panel</h5>
-                                    <p>Settings and configuration options will be available here.</p>
+                            <div class="container-fluid h-100 py-2">
+                                <div class="row h-100">
+                                    <!-- Left Column - Hardware Limits -->
+                                    <div class="col-4">
+                                        <div class="card bg-dark border-warning h-100">
+                                            <div class="card-header bg-warning text-dark py-1">
+                                                <h6 class="card-title mb-0 small">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i>Hardware Limits
+                                                </h6>
+                                            </div>
+                                            <div class="card-body py-2">
+                                                <div class="mb-3">
+                                                    <label for="max-voltage-setting" class="form-label small mb-1">
+                                                        Max Voltage (RMS)
+                                                    </label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" class="form-control" id="max-voltage-setting" 
+                                                            min="1" max="500" step="1" value="250">
+                                                        <span class="input-group-text">V</span>
+                                                    </div>
+                                                    <small class="text-muted">Current: <span id="current-max-voltage">250</span>V</small>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="max-current-setting" class="form-label small mb-1">
+                                                        Max Current (RMS)
+                                                    </label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" class="form-control" id="max-current-setting" 
+                                                            min="0.1" max="50" step="0.1" value="10">
+                                                        <span class="input-group-text">A</span>
+                                                    </div>
+                                                    <small class="text-muted">Current: <span id="current-max-current">10</span>A</small>
+                                                </div>
+                                                <div class="alert alert-warning py-1 mb-0">
+                                                    <small class="small">
+                                                        <i class="bi bi-info-circle me-1"></i>
+                                                        Changes require restart
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Middle Column - Display & System -->
+                                    <div class="col-4">
+                                        <div class="card bg-dark border-info h-100">
+                                            <div class="card-header bg-info text-dark py-1">
+                                                <h6 class="card-title mb-0 small">
+                                                    <i class="bi bi-display me-1"></i>Display & System
+                                                </h6>
+                                            </div>
+                                            <div class="card-body py-2">
+                                                <div class="mb-3">
+                                                    <label for="chart-refresh-rate" class="form-label small mb-1">Chart Refresh</label>
+                                                    <select class="form-select form-select-sm" id="chart-refresh-rate">
+                                                        <option value="50">20 FPS</option>
+                                                        <option value="100" selected>10 FPS</option>
+                                                        <option value="200">5 FPS</option>
+                                                        <option value="500">2 FPS</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="precision-digits" class="form-label small mb-1">Precision</label>
+                                                    <select class="form-select form-select-sm" id="precision-digits">
+                                                        <option value="1">1 decimal</option>
+                                                        <option value="2" selected>2 decimals</option>
+                                                        <option value="3">3 decimals</option>
+                                                        <option value="4">4 decimals</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-2">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="auto-save-settings" checked>
+                                                        <label class="form-check-label small" for="auto-save-settings">
+                                                            Auto-save Settings
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-0">
+                                                    <div class="form-check form-switch">
+                                                        <input class="form-check-input" type="checkbox" id="debug-mode">
+                                                        <label class="form-check-label small" for="debug-mode">
+                                                            Debug Mode
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Column - Synth Auto-On -->
+                                    <div class="col-4">
+                                        <div class="card bg-dark border-success h-100">
+                                            <div class="card-header bg-success text-dark py-1">
+                                                <h6 class="card-title mb-0 small">
+                                                    <i class="bi bi-power me-1"></i>Synth Auto-On
+                                                </h6>
+                                            </div>
+                                            <div class="card-body py-2 d-flex flex-column">
+                                                <div class="mb-3">
+                                                    <small class="text-muted d-block mb-2">
+                                                        Auto-start channels when system powers on:
+                                                    </small>
+                                                    <div class="d-grid gap-2">
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="synth-auto-on-0">
+                                                            <label class="form-check-label small" for="synth-auto-on-0">
+                                                                <i class="bi bi-circle-fill text-danger me-1"></i>L1 (Phase A) Auto-On
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="synth-auto-on-1">
+                                                            <label class="form-check-label small" for="synth-auto-on-1">
+                                                                <i class="bi bi-circle-fill text-warning me-1"></i>L2 (Phase B) Auto-On
+                                                            </label>
+                                                        </div>
+                                                        <div class="form-check form-switch">
+                                                            <input class="form-check-input" type="checkbox" id="synth-auto-on-2">
+                                                            <label class="form-check-label small" for="synth-auto-on-2">
+                                                                <i class="bi bi-circle-fill text-info me-1"></i>L3 (Phase C) Auto-On
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="alert alert-info py-1 mb-3">
+                                                    <small class="small">
+                                                        <i class="bi bi-info-circle me-1"></i>
+                                                        When enabled, synth channels automatically start after power-on
+                                                    </small>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <div class="d-grid gap-2">
+                                                        <button class="btn btn-outline-success btn-sm" onclick="saveSettings()" title="Save Current Settings">
+                                                            <i class="bi bi-check-lg me-1"></i>Save Settings
+                                                        </button>
+                                                        <button class="btn btn-outline-warning btn-sm" onclick="resetSettings()" title="Reset to Defaults">
+                                                            <i class="bi bi-arrow-counterclockwise me-1"></i>Reset to Defaults
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="flex-grow-1 d-flex align-items-end">
+                                                    <small class="text-muted">
+                                                        Last saved: <span id="settings-last-saved">Never</span>
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

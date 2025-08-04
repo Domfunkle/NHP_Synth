@@ -5,6 +5,19 @@ export function DPF(phaseA, phaseB) {
     return +cosPhi;
 }
 
+// Debounce function to limit how often a function can be called
+export function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Calculate THD (Total Harmonic Distortion) for a given set of harmonics
 export function THD(harmonics) {
     if (!Array.isArray(harmonics) || harmonics.length === 0) return 0;
@@ -58,7 +71,51 @@ export function getGlobalFrequencyHz(AppState) {
 }
 
 export function LoadingSpinner() {
-    return '<div class="col"><div class="alert alert-info">Waiting for data...</div></div>';
+    return `
+        <div class="col d-flex justify-content-center align-items-center" style="min-height: 200px;">
+            <div class="text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="text-muted">Connecting to synthesizers...</div>
+            </div>
+        </div>
+    `;
+}
+
+// Throttle function for high-frequency events (like scroll, resize)
+export function throttle(func, wait) {
+    let timeout;
+    let previous = 0;
+    return function executedFunction(...args) {
+        const now = Date.now();
+        const remaining = wait - (now - previous);
+        if (remaining <= 0 || remaining > wait) {
+            if (timeout) {
+                clearTimeout(timeout);
+                timeout = null;
+            }
+            previous = now;
+            func(...args);
+        } else if (!timeout) {
+            timeout = setTimeout(() => {
+                previous = Date.now();
+                timeout = null;
+                func(...args);
+            }, remaining);
+        }
+    };
+}
+
+// Format numbers with units and proper precision
+export function formatValue(value, unit, precision = 1) {
+    if (typeof value !== 'number' || isNaN(value)) return '--';
+    return `${value.toFixed(precision)} ${unit}`;
+}
+
+// Clamp value between min and max
+export function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }
 
 export function roundToPrecision(value, precision) {

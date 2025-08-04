@@ -17,8 +17,8 @@ formatter = logging.Formatter('%(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-STATE_FILE = os.path.join(os.path.dirname(__file__), 'synth_state.json')
-DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'defaults.json')
+STATE_FILE = os.path.join(os.path.dirname(__file__), 'config', 'synth_state.json')
+DEFAULTS_FILE = os.path.join(os.path.dirname(__file__), 'config', 'defaults.json')
 
 
 

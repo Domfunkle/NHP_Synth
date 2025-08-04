@@ -188,3 +188,94 @@
 .border-L3-current {
     border: 1px solid var(--L3-current-color);
 }
+
+/* Settings Panel Styles */
+.settings-section {
+    position: relative;
+}
+
+.settings-section h6 {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.settings-section .form-label {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.settings-section .form-label small {
+    font-size: 0.75rem;
+    font-weight: 400;
+}
+
+.settings-section .input-group-text {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+    border-color: var(--bs-border-color);
+}
+
+.settings-section .form-control:focus,
+.settings-section .form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.settings-section .alert {
+    font-size: 0.8rem;
+    margin-bottom: 0;
+}
+
+/* Settings button animations */
+.btn[onclick="saveSettings()"].btn-success,
+.btn[onclick="saveSettings()"].btn-danger {
+    transition: all 0.3s ease;
+}
+
+/* Compact settings panel for 800x480 display */
+#settings-pane .card {
+    border-width: 2px;
+}
+
+#settings-pane .card-header {
+    min-height: 35px;
+}
+
+#settings-pane .form-control,
+#settings-pane .form-select {
+    font-size: 0.85rem;
+}
+
+#settings-pane .form-check-label {
+    font-size: 0.85rem;
+}
+
+#settings-pane .alert {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Ensure no overflow on fixed screen */
+#settings-pane .container-fluid {
+    max-height: 440px; /* Account for tab header */
+    overflow: hidden;
+}
+
+#settings-pane .card-body {
+    overflow: hidden;
+}
+
+/* Future settings placeholder responsive sizing */
+#settings-pane .display-6 {
+    font-size: 2rem;
+}
+
+@media (max-width: 800px) {
+    #settings-pane .display-6 {
+        font-size: 1.5rem;
+    }
+    
+    #settings-pane .small {
+        font-size: 0.75rem;
+    }
+}
