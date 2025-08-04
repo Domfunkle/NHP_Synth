@@ -1,10 +1,9 @@
 """
-New EncoderManager using Encoder abstraction.
+EncoderManager using Encoder abstraction.
 Handles button press, hold, release, rotation, and LED logic for each encoder.
 """
 import time
 import logging
-from .encoder import Encoder
 
 logger = logging.getLogger("NHP_Synth")
 
@@ -29,6 +28,9 @@ class EncoderManager:
         self.selection_mode = {k: {'synth': 'all', 'ch': 'all'} for k in encoders}
         self.state.selection_mode = self.selection_mode  # Share selection mode with state manager
         self.selection_mode_last_changed = {k: time.time() for k in encoders}  # Track last change time for each func
+        # LED flashing for hold indication
+        self.flash_state = {k: False for k in encoders}  # Track LED on/off state during flashing
+        self.last_flash_time = {k: 0 for k in encoders}  # Track last flash toggle time
 
     # --- Public interface ---
     def update(self):
@@ -53,14 +55,22 @@ class EncoderManager:
                     self.button_hold_time[func] = now
                     self.was_short_held[func] = False
                     self.was_long_held[func] = False
+                    self.flash_state[func] = False
+                    self.last_flash_time[func] = now
                 elif not self.was_short_held[func] and now - self.button_hold_time[func] > self.short_hold_threshold:
                     self.was_short_held[func] = True
-                    # Visual feedback only - command sent on release
-                    self.encoders[func].set_pixel((255, 255, 0))  # Yellow for enable/disable toggle
+                    # Start slow flashing for short hold indication
+                    self._handle_led_flashing(func, now, flash_interval=0.1)
                 elif not self.was_long_held[func] and now - self.button_hold_time[func] > self.long_hold_threshold:
                     self.was_long_held[func] = True
-                    # Visual feedback only - command sent on release
-                    self.encoders[func].set_pixel((255, 255, 255))  # White for reset
+                    # Start fast flashing for long hold indication
+                    self._handle_led_flashing(func, now, flash_interval=0.01)
+                else:
+                    # Handle flashing during hold periods
+                    if self.was_long_held[func]:
+                        self._handle_led_flashing(func, now, flash_interval=0.01)  # Fast flash
+                    elif self.was_short_held[func]:
+                        self._handle_led_flashing(func, now, flash_interval=0.1)  # Slow flash
             else:
                 if self.button_hold_time[func] is not None:
                     if self.was_long_held[func]:
@@ -69,9 +79,12 @@ class EncoderManager:
                         self.on_release_after_short_hold(func)
                     else:
                         self.on_press(func)
+                    # Reset button state and LED
                     self.button_hold_time[func] = None
                     self.was_short_held[func] = False
                     self.was_long_held[func] = False
+                    self.flash_state[func] = False
+                    self.encoders[func].set_pixel(self.led_colors[func])
 
     def on_rotate(self, func, delta):
         """Handle rotation for each encoder based on its own selection_mode and func. Reset inactivity timer."""
@@ -128,22 +141,6 @@ class EncoderManager:
         self.selection_mode[func] = selection_modes[next_index]
         logger.info(f"Selection mode for {func} changed to Synth {self.selection_mode[func]['synth']}, Channel {self.selection_mode[func]['ch']}")
 
-    def on_short_hold(self, func):
-        """Legacy method - commands now executed on release."""
-        pass
-
-    def on_long_hold(self, func):
-        """Legacy method - commands now executed on release."""
-        pass
-
-    def on_hold(self, func):
-        """Legacy method - now handled by on_release_after_long_hold."""
-        pass
-
-    def on_release_after_hold(self, func):
-        """Legacy method - now handled by on_release_after_long_hold."""
-        pass
-
     def _toggle_channel_enabled(self, channel, func):
         """Toggle enabled state for the specified channel based on selection mode."""
         mode = self.selection_mode.get(func, {'synth': 'all', 'ch': channel})
@@ -177,8 +174,8 @@ class EncoderManager:
             self._toggle_channel_enabled('b', func)
         else:
             logger.info(f"{func}: Short hold not supported for this encoder")
-        
-        self.encoders[func].set_pixel(self.led_colors[func])
+
+        # LED color is already restored in the main update method
 
     def on_release_after_long_hold(self, func):
         """Handle release after long hold: execute reset to defaults."""
@@ -278,13 +275,29 @@ class EncoderManager:
             else:
                 send_default(synth_id, mode['ch'])
         
-        self.encoders[func].set_pixel(self.led_colors[func])
+        # LED color is already restored in the main update method
 
     def set_led(self, func, color):
         self.encoders[func].set_pixel(color)
 
     def clear_led(self, func):
         self.encoders[func].clear_pixel()
+
+    def _handle_led_flashing(self, func, current_time, flash_interval):
+        """Handle LED flashing during button hold periods."""
+        if current_time - self.last_flash_time[func] >= flash_interval:
+            self.flash_state[func] = not self.flash_state[func]
+            self.last_flash_time[func] = current_time
+            
+            if self.flash_state[func]:
+                # LED on - show hold indication color
+                if self.was_long_held[func]:
+                    self.encoders[func].set_pixel((255, 255, 255))  # White for long hold
+                elif self.was_short_held[func]:
+                    self.encoders[func].set_pixel(self.led_colors[func])  # func is the color for short hold
+            else:
+                # LED off - turn off during flash
+                self.encoders[func].clear_pixel()
 
     # --- Internal handler methods ---
     def _handle_voltage(self, delta, mode):

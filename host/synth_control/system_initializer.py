@@ -8,6 +8,7 @@ from adafruit_seesaw import digitalio, neopixel
 from .synth_interface import SynthInterface
 from .synth_discovery import SynthDiscovery
 import logging
+import colorsys
 logger = logging.getLogger("NHP_Synth")
 
 class SystemInitializer:
@@ -109,7 +110,7 @@ class SystemInitializer:
 
             if len(present_configs) > 1:
                 logger.info(f"Initializing {len(present_configs)} encoders concurrently...")
-                with ThreadPoolExecutor(max_workers=3) as executor:
+                with ThreadPoolExecutor(max_workers=5) as executor:
                     future_to_config = {
                         executor.submit(init_single_encoder, config, i2c, available_addresses): config 
                         for config in present_configs
@@ -153,6 +154,14 @@ class SystemInitializer:
             logger.error(f"✗ Failed to connect to rotary encoder: {e}")
             logger.warning("Make sure the I2C rotary encoder is connected and powered")
             raise
+    
+        for i in range(120):
+            color = tuple(int(c * 255) for c in colorsys.hsv_to_rgb(3*i/360, 1.0, 1.0))
+            for pixel in pixels.values():
+                if pixel:
+                    pixel.fill(color)
+                    if i == 120:
+                        pixel.fill((255, 255, 255))
 
         step2_start_time = time.time()
         logger.info("[Step 2/4] Connecting to synthesizer...")
@@ -256,12 +265,14 @@ class SystemInitializer:
                 'phase': (0, 0, 255),
                 'harmonics': (255, 0, 255)
             }
+
             for func, pixel in pixels.items():
                 if pixel and func in led_colors:
                     try:
                         pixel.fill(led_colors[func])
                     except:
                         pass
+
             step4_end_time = time.time()
             step4_duration = step4_end_time - step4_start_time
             total_init_time = step4_end_time - init_start_time
