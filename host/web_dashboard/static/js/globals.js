@@ -25,8 +25,10 @@ import {
 
 // State Management
 import {
-    AppState, setSynthState, setOpenOffcanvasId, setSelectedId, getSynthState,
-    getOpenOffcanvasId, getSelectedId
+    AppState, setSynthState, setOpenOffcanvasId, setSelectedId,
+    getSynthState, getOpenOffcanvasId, getSelectedId,
+    getVoltageScale, getCurrentScale, getHorizontalScale,
+    setVoltageScale, setCurrentScale, setHorizontalScale
 } from './state.js';
 
 // Utilities
@@ -84,6 +86,12 @@ window.setSelectedId = setSelectedId;
 window.getSynthState = getSynthState;
 window.getOpenOffcanvasId = getOpenOffcanvasId;
 window.getSelectedId = getSelectedId;
+window.getVoltageScale = getVoltageScale;
+window.getCurrentScale = getCurrentScale;
+window.getHorizontalScale = getHorizontalScale;
+window.setVoltageScale = setVoltageScale;
+window.setCurrentScale = setCurrentScale;
+window.setHorizontalScale = setHorizontalScale;
 
 // Utilities
 window.DPF = DPF;

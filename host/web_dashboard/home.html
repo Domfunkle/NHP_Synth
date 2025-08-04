@@ -68,7 +68,13 @@
                     });
                     // Render the single three-phase waveform (requires all synths)
                     if (AppState.synthState.synths.length >= 3) {
-                        threePhaseWaveformChart(AppState.synthState.synths, `waveform_three_phase`);
+                        threePhaseWaveformChart(
+                            AppState.synthState.synths,
+                            `waveform_three_phase`,
+                            getVoltageScale(),
+                            getCurrentScale(),
+                            getHorizontalScale()
+                        );
                     }
                     console.log(AppState);
 

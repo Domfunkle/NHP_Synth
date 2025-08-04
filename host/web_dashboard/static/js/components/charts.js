@@ -112,7 +112,7 @@ export function singlePhaseWaveformChart(synth, canvasId) {
     });
 }
 
-export function threePhaseWaveformChart(synths, canvasId) {
+export function threePhaseWaveformChart(synths, canvasId, voltage_scale = 1, current_scale = 1, horizontal_scale = 1) {
     const synth_L1 = synths[0];
     const synth_L2 = synths[1];
     const synth_L3 = synths[2];
@@ -120,13 +120,13 @@ export function threePhaseWaveformChart(synths, canvasId) {
 
     const sqrt2 = Math.sqrt(2);
 
-    const L1_voltage_amplitude = (synth_L1.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2;
-    const L2_voltage_amplitude = (synth_L2.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2;
-    const L3_voltage_amplitude = (synth_L3.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2;
+    const L1_voltage_amplitude = (synth_L1.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
+    const L2_voltage_amplitude = (synth_L2.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
+    const L3_voltage_amplitude = (synth_L3.amplitude_a / 100) * VOLTAGE_RMS_MAX * sqrt2 * voltage_scale;
 
-    const L1_current_amplitude = (synth_L1.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2;
-    const L2_current_amplitude = (synth_L2.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2;
-    const L3_current_amplitude = (synth_L3.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2;
+    const L1_current_amplitude = (synth_L1.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
+    const L2_current_amplitude = (synth_L2.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
+    const L3_current_amplitude = (synth_L3.amplitude_b / 100) * CURRENT_RMS_MAX * sqrt2 * current_scale;
 
     const L1_voltage_phase = synth_L1.phase_a;
     const L2_voltage_phase = synth_L2.phase_a;
@@ -138,10 +138,10 @@ export function threePhaseWaveformChart(synths, canvasId) {
 
     const L1_frequency = synth_L1.frequency_a;
     
-    const cycles = 2;
+    const cycles = roundToPrecision(2 * horizontal_scale, 2);
     const N = 200;
     const x = Array.from({ length: (N * cycles) }, (_, i) => (i / N) - cycles/2);
-
+    
     function sumHarmonics(t, amplitude, phase, harmonics) {
         let y = amplitude * Math.sin(2 * Math.PI * L1_frequency/40 * t + (phase * Math.PI / 180));
         if (Array.isArray(harmonics)) {

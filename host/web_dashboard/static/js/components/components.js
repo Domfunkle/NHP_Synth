@@ -78,7 +78,7 @@ function synthCardItem({ synth, idx, phaseLabel }, AppState) {
                     
                     <div class="col-6 px-4">
                         <div class="row py-1 mb-1 border rounded">
-                            <canvas id="${singlePhaseChartCanvasId}" width="360" height="80" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                            <canvas id="${singlePhaseChartCanvasId}" height="80" style="display:block;margin:auto;cursor:pointer;"></canvas>
                         </div>
                         <div class="row">
                             ${harmonicOffCanvas(synth, idx, 'a')}
@@ -197,8 +197,63 @@ export function SynthCards(AppState) {
     </div>
     <div class="card">
         <div class="card-body p-2 align-items-center">
-            <canvas class="border rounded mx-2" id="waveform_three_phase" width="740" height="200" style="display:block;margin:auto;cursor:pointer;"></canvas>
+            <div class="row">
+                <div class="col-10 px-1 text-center">
+                    <canvas class="border rounded mx-2" id="waveform_three_phase" height="200" style="display:block;margin:auto;cursor:pointer;"></canvas>
+                </div>
+                <div class="col-2 px-1 pe-3">
+                    <div class="vstack gap-2">
+                        <div class="hstack gap-0 justify-content-between">
+                            <ul class="list-group">
+                                <li class="list-group-item list-group-item-light text-center py-1">
+                                    <span style="font-style:italic; font-family:Cambria;">V</span>
+                                </li>
+                                <li type="button" class="list-group-item list-group-item-action text-center py-1" id="vertical-scale-voltage-up" onclick="setVoltageScale(getVoltageScale() + 0.1)">
+                                        <i class="bi bi-plus"></i>
+                                </li>
+                                <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="voltage-scale-display">
+                                    ${getVoltageScale().toFixed(1)}x
+                                </li>
+                                <li type="button" class="list-group-item list-group-item-action text-center py-1" id="vertical-scale-voltage-down" onclick="setVoltageScale(getVoltageScale() - 0.1)">
+                                    <i class="bi bi-dash"></i>
+                                </li>
+                            </ul>
+                            <ul class="list-group">
+                                <li class="list-group-item list-group-item-light text-center py-1">
+                                    <span style="font-style:italic; font-family:Cambria;">I</span>
+                                </li>
+                                <li type="button" class="list-group-item list-group-item-action py-1" id="vertical-scale-current-up" onclick="setCurrentScale(getCurrentScale() + 0.1)">
+                                        <i class="bi bi-plus"></i>
+                                </li>
+                                <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="current-scale-display">
+                                    ${getCurrentScale().toFixed(1)}x
+                                </li>
+                                <li type="button" class="list-group-item list-group-item-action py-1" id="vertical-scale-current-down" onclick="setCurrentScale(getCurrentScale() - 0.1)">
+                                    <i class="bi bi-dash"></i>
+                                </li>
+                            </ul>
+                        </div>
+                        <ul class="list-group">
+                            <li class="list-group-item list-group-item-light text-center py-1">
+                                <span>Horiz</span>
+                            </li>
+                            <li class="list-group-item list-group-item-light text-center p-0">
+                                <ul class="list-group list-group-horizontal">
+                                    <li type="button" class="list-group-item list-group-item-action text-center border border-0 border-end p-1" id="horizontal-scale-down" onclick="setHorizontalScale(getHorizontalScale() - 0.1)">
+                                        <i class="bi bi-dash"></i>
+                                    </li>
+                                    <li class="list-group-item list-group-item-light text-center p-1" style="font-size: 0.8em;" id="horizontal-scale-display">
+                                        ${getHorizontalScale().toFixed(1)}x
+                                    </li>
+                                    <li type="button" class="list-group-item list-group-item-action text-center border border-0 border-start p-1" id="horizontal-scale-up" onclick="setHorizontalScale(getHorizontalScale() + 0.1)">
+                                        <i class="bi bi-plus"></i>
+                                    </li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
     `;
 }
