@@ -5,8 +5,7 @@
 
 // Components
 import { SynthCards } from './components/components.js';
-import { singlePhaseWaveformChart, threePhaseWaveformChart } from './components/charts.js';
-import { vectorChart } from './components/vectorChart.js';
+import { threePhaseWaveformChart, initializeChartDrag } from './components/charts.js';
 import { incrementButtons } from './components/incrementButtons.js';
 import { setSelected, clearSelected, selected, incrementSelected, resetSelected } from './components/selection.js';
 
@@ -39,7 +38,13 @@ import {
     getVoltageScale, getCurrentScale, getHorizontalScale,
     setVoltageScale, setCurrentScale, setHorizontalScale,
     setPhaseVisibility, getPhaseVisibility,
-    updatePhaseVisibilityUI
+    updatePhaseVisibilityUI, getTimebase, setTimebase,
+    stepTimebaseUp, stepTimebaseDown, setTimeOffset, getTimeOffsetMs,
+    stepTimeOffsetLeft, stepTimeOffsetRight, resetTimeOffset,
+    getVoltageOffset, getCurrentOffset, setVoltageOffset, setCurrentOffset,
+    stepVoltageOffsetUp, stepVoltageOffsetDown, resetVoltageOffset,
+    stepCurrentOffsetUp, stepCurrentOffsetDown, resetCurrentOffset,
+    stepVoltageScaleUp, stepVoltageScaleDown, stepCurrentScaleUp, stepCurrentScaleDown
 } from './state.js';
 
 // Utilities (used in component templates)
@@ -51,9 +56,8 @@ import {
 
 // === COMPONENT FUNCTIONS (used in generated HTML) ===
 window.SynthCards = SynthCards;
-window.singlePhaseWaveformChart = singlePhaseWaveformChart;
 window.threePhaseWaveformChart = threePhaseWaveformChart;
-window.vectorChart = vectorChart;
+window.initializeChartDrag = initializeChartDrag;
 window.incrementButtons = incrementButtons;
 
 // === SELECTION HANDLERS (used in onclick attributes) ===
@@ -103,6 +107,35 @@ window.getHorizontalScale = getHorizontalScale;
 window.setVoltageScale = setVoltageScale;
 window.setCurrentScale = setCurrentScale;
 window.setHorizontalScale = setHorizontalScale;
+window.getTimebase = getTimebase;
+window.setTimebase = setTimebase;
+window.stepTimebaseUp = stepTimebaseUp;
+window.stepTimebaseDown = stepTimebaseDown;
+
+// === TIME OFFSET FUNCTIONS (used in onclick attributes) ===
+window.setTimeOffset = setTimeOffset;
+window.getTimeOffsetMs = getTimeOffsetMs;
+window.stepTimeOffsetLeft = stepTimeOffsetLeft;
+window.stepTimeOffsetRight = stepTimeOffsetRight;
+window.resetTimeOffset = resetTimeOffset;
+
+// === VERTICAL OFFSET FUNCTIONS (used in onclick attributes) ===
+window.getVoltageOffset = getVoltageOffset;
+window.getCurrentOffset = getCurrentOffset;
+window.setVoltageOffset = setVoltageOffset;
+window.setCurrentOffset = setCurrentOffset;
+window.stepVoltageOffsetUp = stepVoltageOffsetUp;
+window.stepVoltageOffsetDown = stepVoltageOffsetDown;
+window.resetVoltageOffset = resetVoltageOffset;
+window.stepCurrentOffsetUp = stepCurrentOffsetUp;
+window.stepCurrentOffsetDown = stepCurrentOffsetDown;
+window.resetCurrentOffset = resetCurrentOffset;
+
+// === VERTICAL SCALE FUNCTIONS (used in onclick attributes) ===
+window.stepVoltageScaleUp = stepVoltageScaleUp;
+window.stepVoltageScaleDown = stepVoltageScaleDown;
+window.stepCurrentScaleUp = stepCurrentScaleUp;
+window.stepCurrentScaleDown = stepCurrentScaleDown;
 
 // === PHASE VISIBILITY (used in onclick attributes) ===
 window.setPhaseVisibility = setPhaseVisibility;

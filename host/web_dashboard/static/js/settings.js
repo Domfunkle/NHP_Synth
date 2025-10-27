@@ -239,7 +239,7 @@ function updateSettingsUI() {
     const maxCurrentInput = document.getElementById('max-current-setting');
     const currentMaxVoltageSpan = document.getElementById('current-max-voltage');
     const currentMaxCurrentSpan = document.getElementById('current-max-current');
-    
+
     if (maxVoltageInput) {
         maxVoltageInput.value = currentSettings.maxVoltage;
     }
@@ -252,29 +252,29 @@ function updateSettingsUI() {
     if (currentMaxCurrentSpan) {
         currentMaxCurrentSpan.textContent = currentSettings.maxCurrent;
     }
-    
+
     // Display settings
     const chartRefreshSelect = document.getElementById('chart-refresh-rate');
     const precisionSelect = document.getElementById('precision-digits');
-    
+
     if (chartRefreshSelect) {
         chartRefreshSelect.value = currentSettings.chartRefreshRate;
     }
     if (precisionSelect) {
         precisionSelect.value = currentSettings.precisionDigits;
     }
-    
+
     // System settings
     const autoSaveCheckbox = document.getElementById('auto-save-settings');
     const debugModeCheckbox = document.getElementById('debug-mode');
-    
+
     if (autoSaveCheckbox) {
         autoSaveCheckbox.checked = currentSettings.autoSaveSettings;
     }
     if (debugModeCheckbox) {
         debugModeCheckbox.checked = currentSettings.debugMode;
     }
-    
+
     // Synth auto-on settings
     const synthAutoOnCheckboxes = ['synth-auto-on-0', 'synth-auto-on-1', 'synth-auto-on-2'];
     synthAutoOnCheckboxes.forEach((id, index) => {
@@ -283,6 +283,35 @@ function updateSettingsUI() {
             checkbox.checked = currentSettings.synthAutoOn[index];
         }
     });
+
+    // Debug: Add close browser button if in debug mode
+    let closeBtn = document.getElementById('close-browser-btn');
+    // Find the Display & System card body
+    const displaySystemCardBody = document.querySelector('.col-4 .card.border-info .card-body');
+    if (currentSettings.debugMode) {
+        if (!closeBtn) {
+            closeBtn = document.createElement('button');
+            closeBtn.id = 'close-browser-btn';
+            closeBtn.className = 'btn btn-danger mt-3';
+            closeBtn.textContent = 'Close Browser (Debug)';
+            closeBtn.onclick = function() {
+                window.close();
+            };
+            if (displaySystemCardBody) {
+                displaySystemCardBody.appendChild(closeBtn);
+            } else {
+                document.body.appendChild(closeBtn);
+            }
+        } else {
+            closeBtn.style.display = '';
+            // Move the button if it's not in the right place
+            if (displaySystemCardBody && closeBtn.parentElement !== displaySystemCardBody) {
+                displaySystemCardBody.appendChild(closeBtn);
+            }
+        }
+    } else if (closeBtn) {
+        closeBtn.style.display = 'none';
+    }
 }
 
 /**

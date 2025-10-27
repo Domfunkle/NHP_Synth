@@ -28,25 +28,27 @@ export function incrementButtons() {
     };
 
     return `
-        <div class="vstack gap-2">
-            <button class="btn btn-outline-info p-2 btn-lg" type="button"
+        <div class="vstack gap-4 my-2">
+            <button class="btn btn-outline-info p-2 btn-lg fs-1" type="button"
+                style="height:80px;"
                 onclick="incrementSelected(${adjustment})">
                 <span class="bi bi-arrow-up"></span>
             </button>
-            <button class="btn btn-outline-info p-2 btn-lg" type="button"
+            <button class="btn btn-outline-info p-2 btn-lg fs-1" type="button"
+                style="height:80px;"
                 onclick="incrementSelected(${-adjustment})">
                 <span class="bi bi-arrow-down"></span>
             </button>
-            <div class="d-flex flex-row gap-2">
-                <button class="btn btn-outline-light p-2 w-50" type="button"
-                    onclick="toggleIncrementAdjustment()">
-                    <i class="bi bi-plus-slash-minus"></i> ${adjustment}
-                </button>
-                <button class="btn btn-outline-danger p-2 w-50" type="button"
-                    onclick="resetSelected()">
-                    <span class="bi bi-arrow-clockwise"></span>
-                </button>
-            </div>
+            <button class="btn btn-outline-light p-2 btn-lg fs-3" type="button"
+                style="height:80px;"
+                onclick="toggleIncrementAdjustment()">
+                <nobr><i class="bi bi-plus-slash-minus"></i> ${adjustment}</nobr>
+            </button>
+            <button class="btn btn-outline-danger p-2 btn-lg fs-1" type="button"
+                style="height:80px;"
+                onclick="resetSelected()">
+                <span class="bi bi-arrow-clockwise"></span>
+            </button>
         </div>
     `;
 }

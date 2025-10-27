@@ -4,7 +4,7 @@
 <head>
     <title>NHP Synth Home</title>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=800, height=480, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=800, height=480, initial-scale=1, maximum-scale=1 user-scalable=no">
     <link rel="stylesheet" href="static/css/bootstrap.min.css">
     <link rel="stylesheet" href="static/css/bootstrap-icons-1.11.0/bootstrap-icons.css">
     <link rel="stylesheet" href="static/css/style.css">
@@ -24,17 +24,32 @@
     </script>
     <div class="d-flex justify-content-center align-items-center min-vh-100">
         <div class="container-fluid bg-secondary rounded shadow overflow-hidden" style="width:800px; height:480px;">
-            <div class="row bg-dark align-items-center mb-2">
-                <div class="col">
+            <div class="row bg-dark align-items-center mb-0">
+                <div class="col px-0">
                     <nav>
-                        <ul class="nav nav-tabs" id="main-tabs" role="tablist">
+                        <ul class="nav nav-tabs nav-fill" id="main-tabs" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active text-light border-2" id="synth-tab" data-bs-toggle="tab" 
+                                <button class="nav-link active text-light border-2 fs-5 py-3" id="synth-tab" data-bs-toggle="tab" 
                                     data-bs-target="#synth-pane" type="button" role="tab" aria-controls="synth-pane" 
-                                    aria-selected="true">Synth Control</button>
+                                    aria-selected="true">Current System</button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link text-light border-2" id="settings-tab" data-bs-toggle="tab" 
+                                <button class="nav-link text-light border-2 fs-5 py-3" id="waveform-control-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#control-pane" type="button" role="tab" aria-controls="control-pane" 
+                                    aria-selected="false">Control</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link text-light border-2 fs-5 py-3" id="scope-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#scope-pane" type="button" role="tab" aria-controls="scope-pane" 
+                                    aria-selected="false">Scope</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link text-light border-2 fs-5 py-3" id="harmonics-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#harmonics-pane" type="button" role="tab" aria-controls="harmonics-pane" 
+                                    aria-selected="false">Harmonics</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link text-light border-2 fs-5 py-3" id="settings-tab" data-bs-toggle="tab" 
                                     data-bs-target="#settings-pane" type="button" role="tab" aria-controls="settings-pane" 
                                     aria-selected="false">Settings</button>
                             </li>
@@ -58,14 +73,32 @@
             </div>
             <div class="row">
                 <div class="col p-0">
-                    <div class="tab-content px-2" id="main-tab-content">
-                        <div class="tab-pane fade show active h-100" id="synth-pane" role="tabpanel" 
+                    <div class="tab-content px-0" id="main-tab-content">
+                        <div class="tab-pane show active h-100" id="synth-pane" role="tabpanel" 
                             aria-labelledby="synth-tab" tabindex="0">
                             <div id="synth-cards">
                                 <!-- Synth cards will be dynamically inserted here -->
                             </div>
                         </div>
-                        <div class="tab-pane fade" id="settings-pane" role="tabpanel" 
+                        <div class="tab-pane" id="control-pane" role="tabpanel" 
+                            aria-labelledby="control-tab" tabindex="0">
+                            <div id="control-card">
+                                <!-- Waveform control content will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="scope-pane" role="tabpanel" 
+                            aria-labelledby="scope-tab" tabindex="0">
+                            <div id="scope-card">
+                                <!-- Scope content will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="harmonics-pane" role="tabpanel" 
+                            aria-labelledby="harmonics-tab" tabindex="0">
+                            <div id="harmonics-card">
+                                <!-- Harmonics control content will be dynamically inserted here -->
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="settings-pane" role="tabpanel" 
                             aria-labelledby="settings-tab" tabindex="0">
                             <div class="container-fluid h-100 py-2">
                                 <div class="row h-100">

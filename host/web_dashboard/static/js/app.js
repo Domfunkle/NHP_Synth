@@ -2,11 +2,11 @@
 import { 
     setOpenOffcanvasId, setSelectedId, getOpenOffcanvasId, getSelectedId,
     AppState, getVoltageScale, getCurrentScale, getHorizontalScale,
-    updatePhaseVisibilityUI
+    getVoltageOffset, getCurrentOffset, getTimebase, getTimeOffsetMs, updatePhaseVisibilityUI
 } from './state.js';
 import { setSocket, synthStateEquals } from './api.js';
-import { SynthCards } from './components/components.js';
-import { singlePhaseWaveformChart, threePhaseWaveformChart } from './components/charts.js';
+import { SynthCards, ScopeChart, WaveformControl, HarmonicControl } from './components/components.js';
+import { threePhaseWaveformChart } from './components/charts.js';
 import { LoadingSpinner, debounce, throttle } from './utils.js';
 import { errorHandler } from './errorHandler.js';
 import { initializeSettings, setupSettingsListeners } from './settings.js';
@@ -23,12 +23,12 @@ export class SynthApp {
         this.debouncedRender = debounce(() => {
             console.debug('Debounced render triggered');
             this.safeRender();
-        }, 100);
+        }, 50);
 
         // Throttled connection status updates
         this.throttledConnectionUpdate = throttle((connected) => {
             this.updateConnectionStatus(connected);
-        }, 500);
+        }, 100);
     }
 
     // Initialize the application
@@ -102,13 +102,66 @@ export class SynthApp {
             document.addEventListener('DOMContentLoaded', () => {
                 this.renderImmediate();
                 this.setupFullscreenHandler();
+                this.setupTabHandlers();
                 setupSettingsListeners();
             });
         } else {
             // DOM is already ready
             this.renderImmediate();
             this.setupFullscreenHandler();
+            this.setupTabHandlers();
             setupSettingsListeners();
+        }
+    }
+
+    // Setup tab handlers for URL hash management
+    setupTabHandlers() {
+        // Listen for tab changes
+        const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+        tabButtons.forEach(button => {
+            button.addEventListener('shown.bs.tab', (event) => {
+                const targetTab = event.target.getAttribute('data-bs-target');
+                const hash = targetTab.replace('#', '').replace('-pane', '');
+                
+                // Update URL hash without triggering page scroll
+                history.replaceState(null, null, '#' + hash);
+            });
+        });
+
+        // Handle initial hash on page load
+        this.handleInitialHash();
+
+        // Handle browser back/forward navigation
+        window.addEventListener('hashchange', () => {
+            this.handleHashChange();
+        });
+    }
+
+    // Handle initial hash when page loads
+    handleInitialHash() {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            this.activateTab(hash);
+        }
+    }
+
+    // Handle hash changes (back/forward navigation)
+    handleHashChange() {
+        const hash = window.location.hash.replace('#', '');
+        if (hash) {
+            this.activateTab(hash);
+        }
+    }
+
+    // Activate a specific tab by name
+    activateTab(tabName) {
+        const tabButton = document.getElementById(`${tabName}-tab`);
+        const tabPane = document.getElementById(`${tabName}-pane`);
+        
+        if (tabButton && tabPane) {
+            // Use Bootstrap's tab API to show the tab
+            const tab = new bootstrap.Tab(tabButton);
+            tab.show();
         }
     }
 
@@ -162,6 +215,28 @@ export class SynthApp {
     renderSynthContent(cardsContainer) {
         // Render synth cards
         cardsContainer.innerHTML = SynthCards(AppState);
+        
+        // Render waveform control tab content
+        const waveformControlContainer = document.getElementById('control-card');
+        if (waveformControlContainer) {
+            waveformControlContainer.innerHTML = WaveformControl(AppState);
+        }
+        
+        // Render waveforms tab content
+        const scopeContainer = document.getElementById('scope-card');
+        if (scopeContainer) {
+            scopeContainer.innerHTML = '';
+            const waveformContent = document.createElement('div');
+            waveformContent.innerHTML = ScopeChart(AppState);
+            scopeContainer.appendChild(waveformContent.firstElementChild);
+        }
+        
+        // Render harmonics tab content
+        const harmonicsContainer = document.getElementById('harmonics-card');
+        if (harmonicsContainer) {
+            harmonicsContainer.innerHTML = HarmonicControl(AppState);
+        }
+        
         this.renderWaveforms();
         this.updateUIState();
         this.setupStateListeners();
@@ -169,10 +244,6 @@ export class SynthApp {
 
     // Render all waveform charts
     renderWaveforms() {
-        // Single phase waveforms for each synth
-        AppState.synthState.synths.forEach((synth, idx) => {
-            singlePhaseWaveformChart(synth, `waveform_single_phase_${idx}`);
-        });
 
         // Three phase waveform if we have enough synths
         if (AppState.synthState.synths.length >= 3) {
@@ -181,8 +252,16 @@ export class SynthApp {
                 'waveform_three_phase',
                 getVoltageScale(),
                 getCurrentScale(),
-                getHorizontalScale()
+                getTimebase(),
+                getTimeOffsetMs(),
+                getVoltageOffset(),
+                getCurrentOffset()
             );
+            
+            // Initialize chart drag functionality after chart is rendered
+            if (window.initializeChartDrag) {
+                window.initializeChartDrag();
+            }
         }
         updatePhaseVisibilityUI();
     }
@@ -259,6 +338,30 @@ export class SynthApp {
                     this.classList.add('selected');
                 }
             });
+        });
+
+        // Global click handler to clear selection when clicking elsewhere
+        document.addEventListener('click', (event) => {
+            // Check if click is on a selectable element, button, or input
+            const isSelectable = event.target.closest('.selectable');
+            const isButton = event.target.closest('button') || event.target.tagName === 'BUTTON';
+            const isInput = event.target.tagName === 'INPUT';
+            const isIcon = event.target.closest('.bi') || event.target.classList.contains('bi');
+            
+            // If click is not on any interactive element, clear selection
+            if (!isSelectable && !isButton && !isInput && !isIcon && window.selected) {
+                // Clear the UI selection (from selection.js)
+                if (window.clearSelected) {
+                    window.clearSelected();
+                }
+                // Also clear the old selection system if it exists
+                if (getSelectedId()) {
+                    setSelectedId(null);
+                    document.querySelectorAll('.selectable').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                }
+            }
         });
     }
 

@@ -12,6 +12,20 @@
     --L3-current-color: hsl(220, 100%, 60%);
 }
 
+
+html, body {
+  touch-action: none; /* disables all browser gestures */
+  overscroll-behavior-x: none; /* prevents swipe navigation */
+}
+
+
+.btn:hover {
+    color: inherit !important;
+    text-decoration: none !important;
+    background-color: inherit !important;
+    border-color: inherit !important;
+}
+
 .dot {
     height: 10px;
     width: 10px;
@@ -99,15 +113,45 @@
     color: var(--L3-current-color);
 }
 
-.bg-L1 {
-    background-color: color-mix(in srgb, var(--L1-current-color) 20%, black 80%);
+.bg-L1-voltage {
+    background-color: var(--L1-voltage-color);
+    color: black;
 }
-.bg-L2 {
-    background-color: color-mix(in srgb, var(--L2-current-color) 20%, black 80%);
+.bg-L1-current {
+    background-color: var(--L1-current-color);
+    color: white
 }
-.bg-L3 {
-    background-color: color-mix(in srgb, var(--L3-current-color) 20%, black 80%);
+.bg-L2-voltage {
+    background-color: var(--L2-voltage-color);
+    color: black;
 }
+.bg-L2-current {
+    background-color: var(--L2-current-color);
+    color: black;
+}
+.bg-L3-voltage {
+    background-color: var(--L3-voltage-color);
+    color: black;
+}
+.bg-L3-current {
+    background-color: var(--L3-current-color);
+    color: white;
+}
+
+.bg-L1-dark {
+    background-color: color-mix(in srgb, var(--L1-current-color) 40%, black 60%);
+    color: white;
+}
+.bg-L2-dark {
+    background-color: color-mix(in srgb, var(--L2-current-color) 40%, black 60%);
+    color: white;
+}
+.bg-L3-dark {
+    background-color: color-mix(in srgb, var(--L3-current-color) 40%, black 60%);
+    color: white;
+}
+
+
 
 .btn-outline-L1-voltage {
     --bs-btn-color: var(--L1-voltage-color);
@@ -268,6 +312,19 @@
 /* Future settings placeholder responsive sizing */
 #settings-pane .display-6 {
     font-size: 2rem;
+}
+
+/* Custom styling for vertical slider thumbs - override Bootstrap defaults */
+#voltage-offset-slider::-webkit-slider-thumb,
+#current-offset-slider::-webkit-slider-thumb {
+    width: 55px !important;
+    height: 30px !important;
+}
+
+#voltage-offset-slider::-moz-range-thumb,
+#current-offset-slider::-moz-range-thumb {
+    width: 55px !important;
+    height: 30px !important;
 }
 
 @media (max-width: 800px) {
