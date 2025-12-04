@@ -394,8 +394,10 @@ static void dds_output(void) {
         sqw_output_state = !sqw_output_state;
         gpio_set_level(SQUARE_WAVE_OUTPUT, sqw_output_state);
         if (sqw_output_state == 1) {
-            dds_acc[0] = dds_phase_offset[0];
-            dds_acc[1] = dds_phase_offset[1];
+            // Reset at waveform peak (quarter-cycle) to minimize glitch
+            uint32_t peak_off = TABLE_SIZE / 4;
+            dds_acc[0] = (dds_phase_offset[0] + peak_off) % TABLE_SIZE;
+            dds_acc[1] = (dds_phase_offset[1] + peak_off) % TABLE_SIZE;
         }
         sqw_acc = 0;
     }
@@ -502,8 +504,10 @@ static void IRAM_ATTR sqw_isr_handler(void* arg) {
     sqw_acc = 0; // Reset square wave accumulator on GPIO19 event
     sqw_output_state = 1;
     gpio_set_level(SQUARE_WAVE_OUTPUT, sqw_output_state);
-    dds_acc[0] = dds_phase_offset[0];
-    dds_acc[1] = dds_phase_offset[1];
+    // Reset at waveform peak (quarter-cycle) to minimize glitch
+    uint32_t peak_off = TABLE_SIZE / 4;
+    dds_acc[0] = (dds_phase_offset[0] + peak_off) % TABLE_SIZE;
+    dds_acc[1] = (dds_phase_offset[1] + peak_off) % TABLE_SIZE;
 }
 
 static void global_gpio_init(void) {
