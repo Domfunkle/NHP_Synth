@@ -9,9 +9,26 @@ RESTART_DELAY=5
 LOG_FILE="$HOME/NHP_Synth/synth_autostart.log"
 PID_FILE="$HOME/NHP_Synth/synth.pid"
 
+# Log trimming settings (keep latest 10,000 lines, drop oldest)
+MAX_LOG_LINES=1000
+
+trim_log_lines() {
+    # Ensure log file exists
+    [ -f "$LOG_FILE" ] || : > "$LOG_FILE"
+    local line_count
+    line_count=$(wc -l < "$LOG_FILE" 2>/dev/null | tr -d ' ')
+    if [ -n "$line_count" ] && [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
+        # Keep only the last MAX_LOG_LINES lines
+        local tmpfile
+        tmpfile=$(mktemp)
+        tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "$tmpfile" && mv "$tmpfile" "$LOG_FILE"
+    fi
+}
+
 # Logging function
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+    trim_log_lines
 }
 
 # Cleanup function

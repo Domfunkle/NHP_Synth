@@ -8,9 +8,29 @@ LOG_FILE="$HOME/NHP_Synth/kiosk_autostart.log"
 PID_FILE="$HOME/NHP_Synth/kiosk.pid"
 KIOSK_URL="http://localhost:5000"
 
+# Readiness check settings
+SYNTH_PID_FILE="$HOME/NHP_Synth/synth.pid"
+READINESS_TIMEOUT=120 # seconds
+READINESS_POLL_INTERVAL=2 # seconds
+
 # Logging function
 log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a "$LOG_FILE"
+    trim_log_lines
+}
+
+# Log trimming settings (keep latest 1,000 lines)
+MAX_LOG_LINES=1000
+
+trim_log_lines() {
+    [ -f "$LOG_FILE" ] || : > "$LOG_FILE"
+    local line_count
+    line_count=$(wc -l < "$LOG_FILE" 2>/dev/null | tr -d ' ')
+    if [ -n "$line_count" ] && [ "$line_count" -gt "$MAX_LOG_LINES" ]; then
+        local tmpfile
+        tmpfile=$(mktemp)
+        tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "$tmpfile" && mv "$tmpfile" "$LOG_FILE"
+    fi
 }
 
 # Cleanup function
@@ -53,6 +73,47 @@ if [ -z "$DISPLAY" ]; then
     export DISPLAY=:0
     log_message "Set DISPLAY to :0"
 fi
+
+# Wait until the synth main service is ready
+wait_for_synth_ready() {
+    local start_ts=$(date +%s)
+    log_message "Waiting for synth service readiness..."
+
+    while true; do
+        # Check PID file exists and process is alive
+        if [ -f "$SYNTH_PID_FILE" ]; then
+            local synth_pid
+            synth_pid=$(cat "$SYNTH_PID_FILE" 2>/dev/null)
+            if [ -n "$synth_pid" ] && kill -0 "$synth_pid" 2>/dev/null; then
+                log_message "Synth PID $synth_pid is running. Checking web service..."
+                # Check the web server is responding
+                if command -v curl >/dev/null 2>&1; then
+                    if curl -s -o /dev/null -w "%{http_code}" "$KIOSK_URL" | grep -qE '^(200|302|301)$'; then
+                        log_message "Web service responding at $KIOSK_URL"
+                        break
+                    fi
+                else
+                    # Fallback: attempt TCP connection via bash builtin
+                    exec 3<>/dev/tcp/localhost/5000 2>/dev/null && { exec 3>&-; log_message "TCP port 5000 reachable"; break; }
+                fi
+            else
+                log_message "Synth PID not alive yet."
+            fi
+        else
+            log_message "Synth PID file not found at $SYNTH_PID_FILE."
+        fi
+
+        # Timeout handling
+        local now_ts=$(date +%s)
+        if [ $((now_ts - start_ts)) -ge "$READINESS_TIMEOUT" ]; then
+            log_message "Readiness timeout ($READINESS_TIMEOUT s). Proceeding to launch browser anyway."
+            break
+        fi
+        sleep "$READINESS_POLL_INTERVAL"
+    done
+}
+
+wait_for_synth_ready
 
 # Function to find available browser
 find_browser() {
