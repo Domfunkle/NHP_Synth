@@ -134,6 +134,18 @@ export function synthStateEquals(a, b) {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
+export async function getServiceStatus() {
+    return apiGet('/api/status');
+}
+
+export async function getLogs(lines = 200) {
+    return apiGet(`/api/logs?lines=${encodeURIComponent(lines)}`);
+}
+
+export async function restartService() {
+    return apiPost('/api/restart', {});
+}
+
 /**
  * Get the defaults for the synth state
  * @returns {object}

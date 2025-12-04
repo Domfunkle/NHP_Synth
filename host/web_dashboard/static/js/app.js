@@ -4,7 +4,7 @@ import {
     AppState, getVoltageScale, getCurrentScale, getHorizontalScale,
     getVoltageOffset, getCurrentOffset, getTimebase, getTimeOffsetMs, updatePhaseVisibilityUI
 } from './state.js';
-import { setSocket, synthStateEquals } from './api.js';
+import { setSocket, synthStateEquals, getServiceStatus, getLogs, restartService } from './api.js';
 import { SynthCards, ScopeChart, WaveformControl, HarmonicControl } from './components/components.js';
 import { threePhaseWaveformChart } from './components/charts.js';
 import { LoadingSpinner, debounce, throttle } from './utils.js';
@@ -17,6 +17,12 @@ export class SynthApp {
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
+        this._logBuffer = [];
+        this._autoScroll = true;
+        this._socketLogsEnabled = true;
+        this._pendingLines = [];
+        this._preloadLines = 200; // default; will sync with selector
+        this._maxBufferedLines = 2000;
         
         // Create debounced render function to prevent excessive re-renders
         // 100ms delay allows for multiple rapid updates to be batched
@@ -93,6 +99,86 @@ export class SynthApp {
                 this.debouncedRender();
             }
         });
+
+        // Service status via socket
+        this.socket.on('serviceStatus', (status) => {
+            const running = typeof status.running === 'string'
+                ? status.running.toLowerCase() === 'true'
+                : !!status.running;
+            const pidVal = status.pid !== undefined && status.pid !== null ? status.pid : '-';
+            const indicator = document.getElementById('service-running-indicator');
+            const pidSpan = document.getElementById('service-pid');
+            if (indicator) {
+                indicator.className = running ? 'badge bg-success' : 'badge bg-danger';
+                indicator.textContent = running ? 'Running' : 'Stopped';
+            }
+            if (pidSpan) pidSpan.textContent = pidVal;
+        });
+
+        // Service logs stream via socket (incremental)
+        this.socket.on('serviceLogs', (payload) => {
+            if (!this._socketLogsEnabled) return;
+            const pre = document.getElementById('logs-view');
+            if (!pre) return;
+            if (!pre._scrollInit) {
+                pre.addEventListener('scroll', () => {
+                    const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 2;
+                    const wasAuto = this._autoScroll;
+                    this._autoScroll = atBottom;
+                    // If user resumed autoscroll, flush pending lines and prune to preload size
+                    if (!wasAuto && this._autoScroll) {
+                        if (this._pendingLines.length > 0) {
+                            // Append pending lines
+                            const oldHeight = pre.scrollHeight;
+                            this._logBuffer.push(...this._pendingLines);
+                            pre.textContent += (pre.textContent ? '\n' : '') + this._pendingLines.join('\n');
+                            this._pendingLines = [];
+                            // Now prune back to preload size
+                            const keep = Math.max(10, this._preloadLines);
+                            if (this._logBuffer.length > keep) {
+                                this._logBuffer = this._logBuffer.slice(this._logBuffer.length - keep);
+                                pre.textContent = this._logBuffer.join('\n');
+                            }
+                            pre.scrollTop = pre.scrollHeight;
+                        }
+                    }
+                });
+                pre._scrollInit = true;
+            }
+            const lines = Array.isArray(payload?.lines) ? payload.lines : [];
+            if (lines.length === 0) return;
+            const select = document.getElementById('log-lines');
+            if (select) {
+                const v = parseInt(select.value || '200');
+                if (!isNaN(v)) this._preloadLines = v;
+            }
+
+            if (this._autoScroll) {
+                // Append
+                this._logBuffer.push(...lines);
+                // Prune to preload window when autoscrolling
+                const keep = Math.max(10, this._preloadLines);
+                if (this._logBuffer.length > keep) {
+                    this._logBuffer = this._logBuffer.slice(this._logBuffer.length - keep);
+                    pre.textContent = this._logBuffer.join('\n');
+                } else {
+                    pre.textContent += (pre.textContent ? '\n' : '') + lines.join('\n');
+                }
+                pre.scrollTop = pre.scrollHeight;
+            } else {
+                // User is inspecting; do not prune. Buffer up to maxBufferedLines.
+                if (this._logBuffer.length + lines.length <= this._maxBufferedLines) {
+                    this._logBuffer.push(...lines);
+                    const oldHeight = pre.scrollHeight;
+                    pre.textContent += (pre.textContent ? '\n' : '') + lines.join('\n');
+                    // Preserve user's scroll position (no forced movement)
+                    pre.scrollTop = Math.max(0, pre.scrollTop);
+                } else {
+                    // Reached memory cap while paused: queue lines, render when autoscroll resumes
+                    this._pendingLines.push(...lines);
+                }
+            }
+        });
     }
 
     // Setup DOM event listeners
@@ -104,6 +190,8 @@ export class SynthApp {
                 this.setupFullscreenHandler();
                 this.setupTabHandlers();
                 setupSettingsListeners();
+                // If Status tab is already open, start its refresh loop
+                this.ensureStatusAutoRefresh();
             });
         } else {
             // DOM is already ready
@@ -111,6 +199,17 @@ export class SynthApp {
             this.setupFullscreenHandler();
             this.setupTabHandlers();
             setupSettingsListeners();
+            // If Status tab is already open, start its refresh loop
+            this.ensureStatusAutoRefresh();
+        }
+
+        // Clicking the connection icon opens the Status view
+        const connIcon = document.getElementById('connection-icon');
+        if (connIcon) {
+            connIcon.style.cursor = 'pointer';
+            connIcon.addEventListener('click', () => {
+                this.openStatusView();
+            });
         }
     }
 
@@ -135,6 +234,156 @@ export class SynthApp {
         window.addEventListener('hashchange', () => {
             this.handleHashChange();
         });
+
+        const statusBtn = document.getElementById('status-tab');
+        if (statusBtn) {
+            statusBtn.addEventListener('shown.bs.tab', () => {
+                this.refreshStatusAndLogs(true);
+                this.startStatusAutoRefresh();
+            });
+            statusBtn.addEventListener('hide.bs.tab', () => {
+                this.stopStatusAutoRefresh();
+            });
+        }
+    }
+
+    async refreshStatusAndLogs(scrollToEnd = false) {
+        try {
+            const statusResp = await getServiceStatus();
+            // Support both flat and nested shapes
+            const status = statusResp && statusResp.running !== undefined
+                ? statusResp
+                : (statusResp && statusResp.status ? statusResp.status : {});
+            const running = typeof status.running === 'string'
+                ? status.running.toLowerCase() === 'true'
+                : !!status.running;
+            const pidVal = status.pid !== undefined && status.pid !== null
+                ? status.pid
+                : (status.pid === 0 ? 0 : '-');
+            const indicator = document.getElementById('service-running-indicator');
+            const pidSpan = document.getElementById('service-pid');
+            if (indicator) {
+                indicator.className = running ? 'badge bg-success' : 'badge bg-danger';
+                indicator.textContent = running ? 'Running' : 'Stopped';
+            }
+            if (pidSpan) pidSpan.textContent = pidVal;
+
+            const select = document.getElementById('log-lines');
+            const lines = select ? parseInt(select.value || '200') : 200;
+            const logsResp = await getLogs(lines);
+            const incoming = (logsResp.lines || []);
+            const pre = document.getElementById('logs-view');
+            if (pre) {
+                // Initialize scroll handler once
+                if (!pre._scrollInit) {
+                    pre.addEventListener('scroll', () => {
+                        const atBottom = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 2;
+                        this._autoScroll = atBottom;
+                    });
+                    pre._scrollInit = true;
+                }
+
+                // Determine if we should append or replace
+                if (this._logBuffer.length === 0) {
+                    this._logBuffer = incoming.slice();
+                    pre.textContent = this._logBuffer.join('\n');
+                    if (scrollToEnd || this._autoScroll) pre.scrollTop = pre.scrollHeight;
+                } else {
+                    // Find overlap and append only new lines
+                    let newLines = [];
+                    // Simple strategy: append lines after the last line we have
+                    const lastLine = this._logBuffer[this._logBuffer.length - 1];
+                    const idx = incoming.lastIndexOf(lastLine);
+                    if (idx >= 0 && idx + 1 < incoming.length) {
+                        newLines = incoming.slice(idx + 1);
+                    } else if (incoming.length > this._logBuffer.length) {
+                        // Fallback: append difference by length
+                        newLines = incoming.slice(this._logBuffer.length);
+                    } else {
+                        // If buffer shrank (rotation/trimming), replace fully
+                        this._logBuffer = incoming.slice();
+                        const prevScrollRatio = pre.scrollTop / Math.max(1, pre.scrollHeight - pre.clientHeight);
+                        pre.textContent = this._logBuffer.join('\n');
+                        if (this._autoScroll) pre.scrollTop = pre.scrollHeight;
+                        else pre.scrollTop = Math.round(prevScrollRatio * Math.max(0, pre.scrollHeight - pre.clientHeight));
+                        return;
+                    }
+
+                    if (newLines.length > 0) {
+                        this._logBuffer = incoming.slice();
+                        // Preserve scroll position if not at bottom by measuring height delta
+                        const wasAtBottom = this._autoScroll || scrollToEnd;
+                        const oldScrollHeight = pre.scrollHeight;
+                        pre.textContent += (pre.textContent ? '\n' : '') + newLines.join('\n');
+                        if (wasAtBottom) {
+                            pre.scrollTop = pre.scrollHeight;
+                        } else {
+                            const heightDelta = pre.scrollHeight - oldScrollHeight;
+                            pre.scrollTop = Math.max(0, pre.scrollTop);
+                            // Keep current viewport; do not force scroll to bottom
+                            // No adjustment needed since we appended at end; user's scrollTop remains
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            const pre = document.getElementById('logs-view');
+            if (pre) pre.textContent = `Error loading status/logs: ${e.message}`;
+        }
+    }
+
+    // Ensure status auto-refresh starts when the status tab exists on load
+    ensureStatusAutoRefresh() {
+        const statusPane = document.getElementById('status-pane');
+        const statusTab = document.getElementById('status-tab');
+        if (statusPane && statusTab) {
+            // If status tab is currently active, start auto-refresh
+            const isActive = statusPane.classList.contains('active') || statusTab.classList.contains('active');
+            if (isActive) {
+                this.refreshStatusAndLogs(true);
+                this.startStatusAutoRefresh();
+            }
+        }
+    }
+
+    startStatusAutoRefresh() {
+        if (this._statusInterval) return;
+        const btn = document.getElementById('refresh-status-btn');
+        if (btn) btn.onclick = () => this.refreshStatusAndLogs(true);
+        const select = document.getElementById('log-lines');
+        if (select) select.onchange = () => this.refreshStatusAndLogs(true);
+        const restartBtn = document.getElementById('restart-service-btn');
+        if (restartBtn) {
+            restartBtn.onclick = async () => {
+                restartBtn.disabled = true;
+                try {
+                    await restartService();
+                } catch (e) {
+                    console.error('Restart failed', e);
+                } finally {
+                    // Give the supervisor a moment, then refresh
+                    setTimeout(() => {
+                        this.refreshStatusAndLogs(true);
+                        restartBtn.disabled = false;
+                    }, 2000);
+                }
+            };
+        }
+        // Prefer socket updates: disable interval if socket connected
+        if (this.socket && this.socket.connected) {
+            // One-time fetch to populate initial content
+            this.refreshStatusAndLogs(true);
+        } else {
+            // Fallback polling when socket not connected
+            this._statusInterval = setInterval(() => this.refreshStatusAndLogs(false), 2000);
+        }
+    }
+
+    stopStatusAutoRefresh() {
+        if (this._statusInterval) {
+            clearInterval(this._statusInterval);
+            this._statusInterval = null;
+        }
     }
 
     // Handle initial hash when page loads
@@ -162,6 +411,22 @@ export class SynthApp {
             // Use Bootstrap's tab API to show the tab
             const tab = new bootstrap.Tab(tabButton);
             tab.show();
+        }
+    }
+
+    // Open the Status pane without needing a tab button
+    openStatusView() {
+        // Deactivate all panes
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+            pane.classList.remove('show');
+            pane.classList.remove('active');
+        });
+        const statusPane = document.getElementById('status-pane');
+        if (statusPane) {
+            statusPane.classList.add('show');
+            statusPane.classList.add('active');
+            this.refreshStatusAndLogs(true);
+            this.startStatusAutoRefresh();
         }
     }
 

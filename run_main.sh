@@ -8,6 +8,7 @@ MAX_RESTARTS=10
 RESTART_DELAY=5
 LOG_FILE="$HOME/NHP_Synth/synth_autostart.log"
 PID_FILE="$HOME/NHP_Synth/synth.pid"
+PY_PID_FILE="$HOME/NHP_Synth/synth_python.pid"
 
 # Log trimming settings (keep latest 10,000 lines, drop oldest)
 MAX_LOG_LINES=1000
@@ -36,6 +37,9 @@ cleanup() {
     log_message "Cleaning up..."
     if [ -f "$PID_FILE" ]; then
         rm "$PID_FILE"
+    fi
+    if [ -f "$PY_PID_FILE" ]; then
+        rm "$PY_PID_FILE"
     fi
     exit 0
 }
@@ -91,15 +95,34 @@ restart_count=0
 while [ $restart_count -lt $MAX_RESTARTS ]; do
     log_message "Starting attempt #$((restart_count + 1))"
     
-    # Activate virtual environment and run script
+    # Activate virtual environment
     source "$VENV_PATH"
-    
-    # Run the Python script
-    python3 "$SCRIPT_PATH" 2>&1 | while IFS= read -r line; do
+
+    # Create FIFO for logging
+    PIPE_FILE=$(mktemp -u "$HOME/NHP_Synth/.autostart_pipe.XXXX")
+    mkfifo "$PIPE_FILE"
+
+    # Start Python in background, redirect output to FIFO, capture PID
+    stdbuf -oL -eL python3 "$SCRIPT_PATH" > "$PIPE_FILE" 2>&1 &
+    PY_PID=$!
+    echo "$PY_PID" > "$PY_PID_FILE"
+    log_message "Launched Python main (PID: $PY_PID)"
+
+    # Reader: timestamp and append lines from FIFO to log
+    while IFS= read -r line; do
         log_message "PYTHON: $line"
-    done
-    
-    EXIT_CODE=${PIPESTATUS[0]}
+    done < "$PIPE_FILE" &
+    READER_PID=$!
+
+    # Wait for Python to exit
+    wait "$PY_PID"
+    EXIT_CODE=$?
+
+    # Cleanup FIFO reader and pipe
+    if kill -0 "$READER_PID" 2>/dev/null; then
+        kill "$READER_PID" 2>/dev/null || true
+    fi
+    rm -f "$PIPE_FILE"
     
     if [ $EXIT_CODE -eq 0 ]; then
         log_message "Script exited normally (code 0). Stopping auto-restart."

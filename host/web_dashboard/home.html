@@ -53,6 +53,7 @@
                                     data-bs-target="#settings-pane" type="button" role="tab" aria-controls="settings-pane" 
                                     aria-selected="false">Settings</button>
                             </li>
+                            <!-- Status tab removed; use connection icon to open -->
                         </ul>
                     </nav>
                 </div>
@@ -247,6 +248,40 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="tab-pane" id="status-pane" role="tabpanel" 
+                            aria-labelledby="status-tab" tabindex="0">
+                            <div class="container-fluid py-2">
+                                <div class="card bg-dark border-light">
+                                    <div class="card-header py-1">
+                                        <h6 class="card-title mb-0 small"><i class="bi bi-activity me-1"></i>Service Status</h6>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <span id="service-running-indicator" class="badge bg-danger">Stopped</span>
+                                                <span class="ms-2 text-muted small">PID: <span id="service-pid">-</span></span>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <select id="log-lines" class="form-select form-select-sm" style="width:auto">
+                                                    <option value="100" selected>Last 100</option>
+                                                    <option value="200">Last 200</option>
+                                                    <option value="500">Last 500</option>
+                                                    <option value="1000">Last 1000</option>
+                                                </select>
+                                                <button class="btn btn-sm btn-outline-light" id="refresh-status-btn" title="Refresh">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" id="restart-service-btn" title="Restart service">
+                                                    <i class="bi bi-power"></i> Restart
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <pre id="logs-view" class="bg-secondary p-2 rounded" style="height:275px; overflow:auto; font-size:12px;"></pre>
+                                        <small class="text-muted">Auto-refresh every 2s while tab is visible.</small>
                                     </div>
                                 </div>
                             </div>

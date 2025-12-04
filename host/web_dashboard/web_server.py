@@ -4,6 +4,7 @@ import datetime
 import copy
 import time
 import threading
+import subprocess
 
 from flask_socketio import SocketIO, emit
 from flask import Flask, jsonify, request, send_file, send_from_directory
@@ -256,6 +257,97 @@ def create_app(command_queue, state_manager):
             return jsonify({'status': 'Settings reset', 'settings': settings})
         except Exception as e:
             return jsonify({'error': str(e)}), 500
+        
+    @app.route('/api/status', methods=['GET'])
+    def get_status():
+        try:
+            pid_file = os.path.expanduser('~/NHP_Synth/synth.pid')
+            status = {'running': False, 'pid': None}
+            if os.path.exists(pid_file):
+                with open(pid_file, 'r') as f:
+                    pid_str = f.read().strip()
+                if pid_str.isdigit():
+                    pid = int(pid_str)
+                    status['pid'] = pid
+                    try:
+                        os.kill(pid, 0)
+                        status['running'] = True
+                    except OSError:
+                        status['running'] = False
+            # Emit status over socket for listeners
+            try:
+                socketio.emit('serviceStatus', status)
+            except Exception:
+                pass
+            return jsonify(status)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/logs', methods=['GET'])
+    def get_logs():
+        try:
+            lines_param = request.args.get('lines', default='200')
+            try:
+                lines = max(10, min(2000, int(lines_param)))
+            except ValueError:
+                lines = 200
+            log_file = os.path.expanduser('~/NHP_Synth/synth_autostart.log')
+            raw_lines = []
+            if os.path.exists(log_file):
+                with open(log_file, 'rb') as f:
+                    f.seek(0, os.SEEK_END)
+                    size = f.tell()
+                    block = 4096
+                    data = b''
+                    while size > 0 and data.count(b'\n') <= lines * 3:
+                        read_size = min(block, size)
+                        size -= read_size
+                        f.seek(size)
+                        data = f.read(read_size) + data
+                    raw_lines = data.decode('utf-8', errors='replace').splitlines()
+
+            # Temporarily show all log lines without filtering HTTP access logs
+            content = raw_lines[-lines:]
+            return jsonify({'lines': content})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+        
+    @app.route('/api/restart', methods=['POST'])
+    def restart_service():
+        try:
+            # Perform restart in a background thread to avoid request timeouts
+            def do_restart():
+                try:
+                    py_pid_file = os.path.expanduser('~/NHP_Synth/synth_python.pid')
+                    if os.path.exists(py_pid_file):
+                        with open(py_pid_file, 'r') as f:
+                            py_pid_str = f.read().strip()
+                        if py_pid_str.isdigit():
+                            py_pid = int(py_pid_str)
+                            try:
+                                os.kill(py_pid, 0)
+                                os.kill(py_pid, 15)  # SIGTERM python child
+                            except OSError:
+                                pass
+                    # Optionally relaunch supervisor to ensure it is active
+                    script_path = os.path.expanduser('~/NHP_Synth/run_main.sh')
+                    if os.path.exists(script_path):
+                        try:
+                            subprocess.Popen(
+                                ['nohup', 'bash', script_path],
+                                stdout=open(os.path.expanduser('~/NHP_Synth/restart_stdout.log'), 'a'),
+                                stderr=open(os.path.expanduser('~/NHP_Synth/restart_stderr.log'), 'a'),
+                                preexec_fn=os.setpgrp
+                            )
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+
+            threading.Thread(target=do_restart, daemon=True).start()
+            return jsonify({'status': 'restarting'}), 202
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     @app.route('/')
     def home():
@@ -283,6 +375,65 @@ def create_app(command_queue, state_manager):
             time.sleep(0.1)
 
     threading.Thread(target=emit_synth_state, daemon=True).start()
+
+    # Background task: emit service status periodically (reduce API polling need)
+    def emit_service_status_loop():
+        last_status = None
+        while True:
+            try:
+                pid_file = os.path.expanduser('~/NHP_Synth/synth.pid')
+                status = {'running': False, 'pid': None}
+                if os.path.exists(pid_file):
+                    with open(pid_file, 'r') as f:
+                        pid_str = f.read().strip()
+                    if pid_str.isdigit():
+                        pid = int(pid_str)
+                        status['pid'] = pid
+                        try:
+                            os.kill(pid, 0)
+                            status['running'] = True
+                        except OSError:
+                            status['running'] = False
+                if status != last_status:
+                    socketio.emit('serviceStatus', status)
+                    last_status = status
+            except Exception:
+                pass
+            time.sleep(1.0)
+
+    threading.Thread(target=emit_service_status_loop, daemon=True).start()
+
+    # Background task: stream logs to clients (tail synth_autostart.log)
+    def stream_logs_loop():
+        log_path = os.path.expanduser('~/NHP_Synth/synth_autostart.log')
+        pos = 0
+        last_inode = None
+        while True:
+            try:
+                if not os.path.exists(log_path):
+                    time.sleep(1.0)
+                    continue
+                # Detect rotation/truncation: inode or size decreased
+                st = os.stat(log_path)
+                if last_inode is None:
+                    last_inode = st.st_ino
+                elif st.st_ino != last_inode or st.st_size < pos:
+                    # File rotated/recreated or truncated; reset position
+                    last_inode = st.st_ino
+                    pos = 0
+
+                with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                    f.seek(pos)
+                    new_lines = f.readlines()
+                    pos = f.tell()
+                # Temporarily emit all new lines (including HTTP access logs)
+                if new_lines:
+                    socketio.emit('serviceLogs', {'lines': [ln.rstrip('\n') for ln in new_lines]})
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+    threading.Thread(target=stream_logs_loop, daemon=True).start()
 
     # Handle socket connection to emit initial synth state
     @socketio.on('connect')
