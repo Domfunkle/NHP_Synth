@@ -18,12 +18,38 @@ html, body {
   overscroll-behavior-x: none; /* prevents swipe navigation */
 }
 
+/* Disable Bootstrap hover effects globally */
+/* Buttons: keep normal colors on hover */
+.btn {
+    --bs-btn-hover-bg: var(--bs-btn-bg);
+    --bs-btn-hover-border-color: var(--bs-btn-border-color);
+    --bs-btn-hover-color: var(--bs-btn-color);
+}
 
-.btn:hover {
-    color: inherit !important;
+.btn:hover,
+.btn:focus:hover {
+    color: var(--bs-btn-color) !important;
+    background-color: var(--bs-btn-bg) !important;
+    border-color: var(--bs-btn-border-color) !important;
     text-decoration: none !important;
-    background-color: inherit !important;
+}
+
+/* Nav links and tabs: no hover color/border changes */
+.nav-link:hover {
+    color: inherit !important;
+    background-color: transparent !important;
     border-color: inherit !important;
+    text-decoration: none !important;
+}
+.nav-tabs .nav-link:hover {
+    border-color: transparent transparent transparent !important;
+}
+
+/* List items, dropdowns: keep default on hover */
+.list-group-item:hover,
+.dropdown-item:hover {
+    color: inherit !important;
+    background-color: inherit !important;
 }
 
 .dot {
