@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NHP Synth
+Comment=Launch NHP Synth auto-restart manager
+Exec=bash -c '/home/synth/NHP_Synth/run_main.sh & /home/synth/NHP_Synth/run_kiosk.sh'
+Path=/home/synth/NHP_Synth
+Terminal=true
+Categories=Utility;
+Icon=/home/synth/NHP_Synth/web_dashboard/static/icon.png
