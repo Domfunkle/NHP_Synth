@@ -63,7 +63,8 @@ flasher_args.json
 *.gz
 *.7z
 *.rar
-.lgd-nfy0
+.lgd-*
+.autostart_pipe.*
 host/config/
 *.pid
 
