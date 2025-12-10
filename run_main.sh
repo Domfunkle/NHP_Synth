@@ -41,11 +41,24 @@ cleanup() {
     if [ -f "$PY_PID_FILE" ]; then
         rm "$PY_PID_FILE"
     fi
+    # Kill background reader and python if still running
+    if [ -n "${READER_PID:-}" ] && kill -0 "$READER_PID" 2>/dev/null; then
+        kill "$READER_PID" 2>/dev/null || true
+    fi
+    if [ -n "${PY_PID:-}" ] && kill -0 "$PY_PID" 2>/dev/null; then
+        kill "$PY_PID" 2>/dev/null || true
+    fi
+    # Remove current FIFO if present
+    if [ -n "${PIPE_FILE:-}" ] && [ -p "$PIPE_FILE" ]; then
+        rm -f "$PIPE_FILE"
+    fi
+    # Best-effort cleanup of any leftover FIFOs from prior crashes
+    find "$HOME/NHP_Synth" -maxdepth 1 -type p -name ".autostart_pipe.*" -print0 2>/dev/null | xargs -0 -r rm -f
     exit 0
 }
 
-# Set up signal handlers
-trap cleanup SIGTERM SIGINT
+# Set up signal handlers (ensure cleanup on common exits)
+trap cleanup SIGTERM SIGINT SIGHUP EXIT
 
 # Check if already running
 if [ -f "$PID_FILE" ]; then
@@ -98,7 +111,7 @@ while [ $restart_count -lt $MAX_RESTARTS ]; do
     # Activate virtual environment
     source "$VENV_PATH"
 
-    # Create FIFO for logging
+    # Create FIFO for logging (unique name)
     PIPE_FILE=$(mktemp -u "$HOME/NHP_Synth/.autostart_pipe.XXXX")
     mkfifo "$PIPE_FILE"
 
@@ -123,6 +136,7 @@ while [ $restart_count -lt $MAX_RESTARTS ]; do
         kill "$READER_PID" 2>/dev/null || true
     fi
     rm -f "$PIPE_FILE"
+    PIPE_FILE=""
     
     if [ $EXIT_CODE -eq 0 ]; then
         log_message "Script exited normally (code 0). Stopping auto-restart."
