@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "Adafruit TPS65131 Split Power Supply-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/Adafruit TPS65131 Split Power Supply-eagle-import.kicad_sym")(options "")(descr ""))
+  (lib (name "PCB_Interface-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/PCB_Interface-eagle-import.kicad_sym")(options "")(descr ""))
+)
