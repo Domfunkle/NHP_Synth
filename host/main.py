@@ -11,6 +11,7 @@ import threading
 import multiprocessing
 from utils.logger_setup import setup_logger
 from utils.command_queue import process_command_queue
+from utils.synth_poller import poll_synth_states
 from web_dashboard.web_server import create_app
 from synth_control import SynthStateManager, SystemInitializer, Encoder, EncoderManager
 
@@ -63,11 +64,20 @@ def main():
         try:
             last_save_time = time.time()
             save_interval = 5.0  # seconds
+            last_poll_time = time.time()
+            poll_interval = 1.0  # seconds
             while True:
                 try:
                     # Process queued commands from the dashboard
                     process_command_queue(command_queue, synths, state)
                     encoder_manager.update()
+
+                    # Reconcile in-memory state from real hardware so all clients stay in sync.
+                    now = time.time()
+                    if now - last_poll_time > poll_interval:
+                        poll_synth_states(synths, state)
+                        last_poll_time = now
+
                     now = time.time()
                     if now - last_save_time > save_interval:
                         state.save_state()
