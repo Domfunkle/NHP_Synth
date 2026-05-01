@@ -2,6 +2,60 @@ def process_command_queue(command_queue, synths, state_manager):
     """Process all commands in the multiprocessing queue and dispatch to synths."""
     import logging
     logger = logging.getLogger("NHP_Synth")
+
+    def apply_harmonic_update(synth, synth_state, target_channel, harmonic_value):
+        """Apply one harmonic update to the target channel and keep state in sync."""
+        delete_harmonic = False
+        harmonic_id = harmonic_value.get('id')
+        new_order = harmonic_value.get('order')
+        amplitude = harmonic_value.get('amplitude')
+        phase = harmonic_value.get('phase', 0)
+        channel_key = 'harmonics_' + target_channel
+
+        # Check if the id exists and the order is changing.
+        original_harmonic = None
+        for harmonic in synth_state[channel_key]:
+            if harmonic['id'] == harmonic_id:
+                original_harmonic = harmonic
+                break
+
+        if original_harmonic and original_harmonic['order'] != new_order:
+            # Set original harmonic's amplitude to zero to remove it.
+            synth.set_harmonics(target_channel, {
+                'id': harmonic_id,
+                'order': original_harmonic['order'],
+                'amplitude': 0,
+                'phase': 0
+            })
+            original_harmonic['amplitude'] = 0
+
+        # Setting amplitude to 0 deletes the harmonic if order < 3.
+        command_value = dict(harmonic_value)
+        if new_order < 3:
+            command_value['amplitude'] = 0
+            command_value['order'] = 3
+            delete_harmonic = True
+
+        synth.set_harmonics(target_channel, command_value)
+
+        # Update in-memory state.
+        for harmonic in synth_state[channel_key]:
+            if harmonic['id'] == harmonic_id:
+                if delete_harmonic:
+                    synth_state[channel_key].remove(harmonic)
+                else:
+                    harmonic['order'] = new_order
+                    harmonic['amplitude'] = amplitude
+                    harmonic['phase'] = phase
+                break
+        else:
+            synth_state[channel_key].append({
+                'id': harmonic_id,
+                'order': new_order,
+                'amplitude': amplitude,
+                'phase': phase
+            })
+
     while not command_queue.empty():
         try:
             cmd = command_queue.get_nowait()
@@ -34,56 +88,12 @@ def process_command_queue(command_queue, synths, state_manager):
                     elif channel == 'b':
                         synth_state['phase_b'] = value
                 elif command == 'set_harmonics':
-                    deleteHarmonic = False
-                    id = value.get('id')
-                    new_order = value.get('order')
-                    amplitude = value.get('amplitude')
-                    phase = value.get('phase', 0)
-                    channelStr = 'harmonics_' + channel
+                    apply_harmonic_update(synth, synth_state, channel, value)
 
-                    # Check if the id exists and the order is changing
-                    original_harmonic = None
-                    for harmonic in synth_state[channelStr]:
-                        if harmonic['id'] == id:
-                            original_harmonic = harmonic
-                            break
-
-                    if original_harmonic and original_harmonic['order'] != new_order:
-                        # Set original harmonic's amplitude to zero to remove it
-                        synth.set_harmonics(channel, {
-                            'id': id,
-                            'order': original_harmonic['order'],
-                            'amplitude': 0,
-                            'phase': 0
-                        })
-                        original_harmonic['amplitude'] = 0
-
-                    # setting the amplitude to 0 deletes the harmonic if order < 3
-                    if new_order < 3:
-                        value['amplitude'] = 0
-                        value['order'] = 3
-                        deleteHarmonic = True
-
-                    synth.set_harmonics(channel, value)
-
-                    # Update state
-                    # find the element in the harmonics list with the matching id, update it or create a new one
-                    for harmonic in synth_state[channelStr]:
-                        if harmonic['id'] == id:
-                            if deleteHarmonic:
-                                synth_state[channelStr].remove(harmonic)
-                            else:
-                                harmonic['order'] = new_order
-                                harmonic['amplitude'] = amplitude
-                                harmonic['phase'] = phase
-                            break
-                    else:
-                        synth_state[channelStr].append({
-                            'id': id,
-                            'order': new_order,
-                            'amplitude': amplitude,
-                            'phase': phase
-                        })
+                    # Finite source impedance behavior:
+                    # applying current harmonics also injects matching voltage harmonics.
+                    if channel == 'b':
+                        apply_harmonic_update(synth, synth_state, 'a', value)
 
         except Exception as e:
             logger.error(f"Failed to process command from queue: {e}")
