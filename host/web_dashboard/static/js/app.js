@@ -24,6 +24,7 @@ export class SynthApp {
         this._pendingLines = [];
         this._preloadLines = 200; // default; will sync with selector
         this._maxBufferedLines = 2000;
+        this._dragScrollState = null;
         
         // Create debounced render function to prevent excessive re-renders
         // 100ms delay allows for multiple rapid updates to be batched
@@ -200,6 +201,7 @@ export class SynthApp {
                 this.setupTabHandlers();
                 setupSettingsListeners();
                 initTouchInputManager();
+                this.setupDragScrollFallback();
                 // If Status tab is already open, start its refresh loop
                 this.ensureStatusAutoRefresh();
             });
@@ -210,6 +212,7 @@ export class SynthApp {
             this.setupTabHandlers();
             setupSettingsListeners();
             initTouchInputManager();
+            this.setupDragScrollFallback();
             // If Status tab is already open, start its refresh loop
             this.ensureStatusAutoRefresh();
         }
@@ -222,6 +225,107 @@ export class SynthApp {
                 this.openStatusView();
             });
         }
+    }
+
+    setupDragScrollFallback() {
+        if (this._dragScrollState) return;
+
+        const interactiveSelector = [
+            'input', 'textarea', 'select', 'button', 'a', 'label',
+            '[role="button"]', '.btn', '[data-bs-toggle]', '[data-bs-target]',
+            'canvas', '#chart-drag-overlay'
+        ].join(',');
+
+        const isInteractiveTarget = (target) => {
+            if (!target || !(target instanceof Element)) return false;
+            return !!target.closest(interactiveSelector);
+        };
+
+        const findScrollableAncestor = (target) => {
+            let el = target instanceof Element ? target : null;
+            while (el && el !== document.body) {
+                const isScrollable = el.scrollHeight > el.clientHeight + 1;
+                if (isScrollable) return el;
+                el = el.parentElement;
+            }
+            return null;
+        };
+
+        const state = {
+            active: false,
+            moved: false,
+            startX: 0,
+            startY: 0,
+            startScrollTop: 0,
+            scrollEl: null,
+            cancelNextClick: false,
+        };
+        this._dragScrollState = state;
+
+        const getPoint = (event) => {
+            if (event.touches && event.touches[0]) {
+                return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+            }
+            return { x: event.clientX, y: event.clientY };
+        };
+
+        const startDrag = (event) => {
+            if (event.target instanceof Element && event.target.closest('#scope-pane')) return;
+            if (isInteractiveTarget(event.target)) return;
+
+            const scrollEl = findScrollableAncestor(event.target);
+            if (!scrollEl) return;
+
+            const p = getPoint(event);
+            state.active = true;
+            state.moved = false;
+            state.startX = p.x;
+            state.startY = p.y;
+            state.startScrollTop = scrollEl.scrollTop;
+            state.scrollEl = scrollEl;
+        };
+
+        const moveDrag = (event) => {
+            if (!state.active || !state.scrollEl) return;
+
+            const p = getPoint(event);
+            const dy = p.y - state.startY;
+            const next = state.startScrollTop - dy;
+            state.scrollEl.scrollTop = next;
+
+            if (Math.abs(dy) > 4) {
+                state.moved = true;
+                state.cancelNextClick = true;
+                if (event.cancelable) event.preventDefault();
+            }
+        };
+
+        const endDrag = () => {
+            state.active = false;
+            state.scrollEl = null;
+            state.startScrollTop = 0;
+        };
+
+        document.addEventListener('touchstart', startDrag, { passive: true });
+        document.addEventListener('touchmove', moveDrag, { passive: false });
+        document.addEventListener('touchend', endDrag, { passive: true });
+
+        document.addEventListener('mousedown', (event) => {
+            if (event.button !== 0) return;
+            startDrag(event);
+        });
+        document.addEventListener('mousemove', (event) => {
+            if (!state.active) return;
+            moveDrag(event);
+        });
+        document.addEventListener('mouseup', endDrag);
+
+        document.addEventListener('click', (event) => {
+            if (!state.cancelNextClick) return;
+            state.cancelNextClick = false;
+            event.preventDefault();
+            event.stopPropagation();
+        }, true);
     }
 
     // Setup tab handlers for URL hash management

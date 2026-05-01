@@ -144,6 +144,8 @@ case "$BROWSER" in
         log_message "Launching Chromium/Chrome in kiosk mode..."
         "$BROWSER" \
             --kiosk \
+            --touch-events=enabled \
+            --enable-touch-drag-drop \
             --no-first-run \
             --disable-infobars \
             --disable-session-crashed-bubble \

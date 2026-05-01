@@ -21,8 +21,80 @@
 
 
 html, body {
-  touch-action: none; /* disables all browser gestures */
-  overscroll-behavior-x: none; /* prevents swipe navigation */
+    touch-action: pan-x pan-y; /* allow swipe and scroll on the touchscreen */
+    overscroll-behavior-x: none; /* still prevent horizontal swipe navigation */
+}
+
+body,
+.container-fluid,
+.tab-content,
+.tab-pane,
+.card,
+.card-body,
+.offcanvas,
+.offcanvas-body {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+}
+
+#app-shell {
+    min-height: 0;
+}
+
+#app-content-row {
+    min-height: 0;
+}
+
+#main-tab-content {
+    height: 100%;
+    min-height: 0;
+}
+
+#main-tab-content > .tab-pane {
+    height: 100%;
+    min-height: 0;
+    overflow-y: hidden;
+    overflow-x: hidden;
+    touch-action: auto;
+}
+
+#harmonic-calibration-panel .offcanvas-body {
+    /* Wider side gutters for easier swipe-start in the calibration panel. */
+    padding: 1rem 1.75rem 1.25rem;
+}
+
+#harmonic-calibration-panel .form-control,
+#harmonic-calibration-panel .form-select {
+    font-size: 0.8rem;
+}
+
+#harmonic-calibration-panel .touch-entry.form-control,
+#harmonic-calibration-panel .form-control.form-control-sm {
+    min-height: 1.75rem;
+    padding: 0.16rem 0.38rem;
+}
+
+#harmonic-calibration-panel #harmonic-per-wrap {
+    padding-left: 0.55rem;
+    padding-right: 0.55rem;
+}
+
+.offcanvas-body,
+#status-pane .container-fluid {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
 }
 
 /* Disable Bootstrap hover effects globally */
@@ -359,12 +431,12 @@ html, body {
 
 /* Ensure no overflow on fixed screen */
 #settings-pane .container-fluid {
-    max-height: 440px; /* Account for tab header */
-    overflow: hidden;
+    height: 100%;
+    min-height: 0;
 }
 
 #settings-pane .card-body {
-    overflow: hidden;
+    overflow: visible;
 }
 
 /* Future settings placeholder responsive sizing */
