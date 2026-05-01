@@ -65,7 +65,7 @@ def main():
             last_save_time = time.time()
             save_interval = 5.0  # seconds
             last_poll_time = time.time()
-            poll_interval = 1.0  # seconds
+            poll_interval = 2.5  # seconds
             while True:
                 try:
                     # Process queued commands from the dashboard
@@ -75,7 +75,11 @@ def main():
                     # Reconcile in-memory state from real hardware so all clients stay in sync.
                     now = time.time()
                     if now - last_poll_time > poll_interval:
+                        for synth in synths:
+                            synth.silent = True
                         poll_synth_states(synths, state)
+                        for synth in synths:
+                            synth.silent = False
                         last_poll_time = now
 
                     now = time.time()

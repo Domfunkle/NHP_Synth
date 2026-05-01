@@ -2,6 +2,8 @@
 
 let socketInstance = null;
 export function setSocket(s) { socketInstance = s; }
+let defaultsCache = null;
+let defaultsCacheTime = 0;
 
 /**
  * GET from API endpoint
@@ -151,5 +153,12 @@ export async function restartService() {
  * @returns {object}
  */
 export async function getDefaults() {
-    return apiGet('/api/defaults');
+    const now = Date.now();
+    if (defaultsCache && (now - defaultsCacheTime) < 30000) {
+        return defaultsCache;
+    }
+    const defaults = await apiGet('/api/defaults');
+    defaultsCache = defaults;
+    defaultsCacheTime = now;
+    return defaults;
 }

@@ -9,7 +9,8 @@ import { SynthCards, ScopeChart, WaveformControl, HarmonicControl } from './comp
 import { threePhaseWaveformChart } from './components/charts.js';
 import { LoadingSpinner, debounce, throttle } from './utils.js';
 import { errorHandler } from './errorHandler.js';
-import { initializeSettings, setupSettingsListeners } from './settings.js';
+import { initializeSettings, setupSettingsListeners, applyServerSettings } from './settings.js';
+import { initTouchInputManager } from './touchInputManager.js';
 
 export class SynthApp {
     constructor() {
@@ -115,6 +116,14 @@ export class SynthApp {
             if (pidSpan) pidSpan.textContent = pidVal;
         });
 
+        // Settings sync across multiple WebUI clients.
+        this.socket.on('settingsUpdated', (payload) => {
+            const settings = payload && payload.settings ? payload.settings : payload;
+            if (settings) {
+                applyServerSettings(settings);
+            }
+        });
+
         // Service logs stream via socket (incremental)
         this.socket.on('serviceLogs', (payload) => {
             if (!this._socketLogsEnabled) return;
@@ -190,6 +199,7 @@ export class SynthApp {
                 this.setupFullscreenHandler();
                 this.setupTabHandlers();
                 setupSettingsListeners();
+                initTouchInputManager();
                 // If Status tab is already open, start its refresh loop
                 this.ensureStatusAutoRefresh();
             });
@@ -199,6 +209,7 @@ export class SynthApp {
             this.setupFullscreenHandler();
             this.setupTabHandlers();
             setupSettingsListeners();
+            initTouchInputManager();
             // If Status tab is already open, start its refresh loop
             this.ensureStatusAutoRefresh();
         }
@@ -224,6 +235,9 @@ export class SynthApp {
                 
                 // Update URL hash without triggering page scroll
                 history.replaceState(null, null, '#' + hash);
+
+                // Recompute harmonics sizing when layout changes between tabs.
+                this.updateHarmonicsLayoutSizing();
             });
         });
 
@@ -437,6 +451,8 @@ export class SynthApp {
             fsBtn.addEventListener('click', this.toggleFullscreen.bind(this));
         }
 
+        window.addEventListener('resize', () => this.updateHarmonicsLayoutSizing());
+
         // Update fullscreen icon when state changes
         const updateFullscreenIcon = () => {
             const icon = document.getElementById('fullscreen-icon');
@@ -452,6 +468,7 @@ export class SynthApp {
         document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
         document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
         document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+        document.addEventListener('fullscreenchange', () => this.updateHarmonicsLayoutSizing());
     }
 
     // Main render function with error boundary
@@ -464,6 +481,32 @@ export class SynthApp {
         } else {
             cardsContainer.innerHTML = LoadingSpinner();
         }
+    }
+
+    updateHarmonicsLayoutSizing() {
+        const root = document.documentElement;
+        const content = document.getElementById('main-tab-content');
+        if (!root || !content) return;
+
+        const contentHeight = content.clientHeight || 390;
+
+        // Each phase card contains 2 tables x (header + 4 rows) ~= 10 visual rows.
+        // Reserve room for card headers/margins and size controls from remaining space.
+        const visualRows = 10;
+        const reservePx = 78;
+        const rowPx = Math.max(20, Math.floor((contentHeight - reservePx) / visualRows));
+
+        const inputPx = Math.max(21, Math.min(27, rowPx - 4));
+        const inputFontPx = Math.max(12, Math.min(15, Math.round(inputPx * 0.56)));
+        const headFontPx = Math.max(11, Math.min(14, Math.round(rowPx * 0.5)));
+        const padYPx = Math.max(1, Math.min(4, Math.round((rowPx - inputPx) * 0.45)));
+        const padXPx = Math.max(2, Math.min(5, Math.round(inputPx * 0.12)));
+
+        root.style.setProperty('--harmonics-input-height', `${inputPx}px`);
+        root.style.setProperty('--harmonics-input-font-size', `${inputFontPx}px`);
+        root.style.setProperty('--harmonics-head-font-size', `${headFontPx}px`);
+        root.style.setProperty('--harmonics-cell-pad-y', `${padYPx}px`);
+        root.style.setProperty('--harmonics-cell-pad-x', `${padXPx}px`);
     }
 
     // Safe render with error handling
@@ -501,6 +544,8 @@ export class SynthApp {
         if (harmonicsContainer) {
             harmonicsContainer.innerHTML = HarmonicControl(AppState);
         }
+
+        this.updateHarmonicsLayoutSizing();
         
         this.renderWaveforms();
         this.updateUIState();

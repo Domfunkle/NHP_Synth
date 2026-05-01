@@ -9,6 +9,7 @@ import time
 from typing import Optional, Union
 import logging
 from utils.command_parser import parse_synth_command
+from utils.harmonic_calibration import apply_command_phase_correction, apply_readback_phase_correction
 logger = logging.getLogger("NHP_Synth")
 
 class SynthInterface:
@@ -26,6 +27,7 @@ class SynthInterface:
         self.baudrate = baudrate
         self.ser: Optional[serial.Serial] = None
         self.id = id
+        self.silent = False
         
     def connect(self) -> bool:
         """
@@ -62,7 +64,7 @@ class SynthInterface:
             return False
 
         try:
-            if logger.isEnabledFor(logging.DEBUG):
+            if logger.isEnabledFor(logging.DEBUG) and not self.silent:
                 logger.debug(f"Synth # {self.id} sending cmd: {command} \t\t {parse_synth_command(command)}")
                 
             self.ser.write(f"{command}\r".encode())
@@ -84,7 +86,7 @@ class SynthInterface:
             raise ValueError("Channel must be 'a' or 'b'")
         self.send_command(f"ren{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isEnabledFor(logging.DEBUG) and not self.silent:
             logger.debug(f"Synth # {self.id} rcvd res: {response} \t\t {parse_synth_command(response)}")
             
         try:
@@ -126,7 +128,7 @@ class SynthInterface:
         
         self.send_command(f"rf{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isEnabledFor(logging.DEBUG) and not self.silent:
             logger.debug(f"Synth # {self.id} rcvd freq res: {response} \t\t {parse_synth_command(response)}")
             
         try:
@@ -169,7 +171,7 @@ class SynthInterface:
         
         self.send_command(f"ra{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isEnabledFor(logging.DEBUG) and not self.silent:
             logger.debug(f"Synth # {self.id} rcvd res: {response} \t\t {parse_synth_command(response)}")
             
         try:
@@ -212,7 +214,7 @@ class SynthInterface:
         
         self.send_command(f"rp{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isEnabledFor(logging.DEBUG) and not self.silent:
             logger.debug(f"Synth # {self.id} rcvd phase res: {response} \t\t {parse_synth_command(response)}")
 
         try:
@@ -257,7 +259,7 @@ class SynthInterface:
 
         self.send_command(f"rh{channel.lower()}")
         response = self.ser.readline().decode().strip()
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isEnabledFor(logging.DEBUG) and not self.silent:
             logger.debug(f"Synth # {self.id} rcvd harmonics res: {response} \t\t {parse_synth_command(response)}")
 
         harmonics = []
@@ -274,7 +276,8 @@ class SynthInterface:
                     parts = harmonic.split(',')
                     order = int(parts[0])
                     amplitude = float(parts[1])
-                    phase = float(parts[2]) if len(parts) > 2 else 0.0
+                    raw_phase = float(parts[2]) if len(parts) > 2 else 0.0
+                    phase = apply_readback_phase_correction(order, raw_phase)
                     harmonics.append({
                         "order": order,
                         "amplitude": amplitude,
@@ -310,8 +313,9 @@ class SynthInterface:
             raise ValueError("Harmonic amplitude must be between 0 and 100")
         if not (-360 <= phase <= 360):
             raise ValueError("Harmonic phase must be between -360 and +360 degrees")
-        
-        return self.send_command(f"wh{channel.lower()}{order},{amplitude},{phase}")
+
+        corrected_phase = apply_command_phase_correction(order, phase)
+        return self.send_command(f"wh{channel.lower()}{order},{amplitude},{corrected_phase}")
 
     def clear_harmonics(self, channel: str) -> bool:
         """

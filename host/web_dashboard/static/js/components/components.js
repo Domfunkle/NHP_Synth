@@ -2,7 +2,6 @@
 // Exported as ES module
 
 import { getMaxVoltage, getMaxCurrent } from '../settings.js';
-import { incrementButtons } from './incrementButtons.js';
 
 // listener for offcanvas close events
 document.addEventListener('hidden.bs.offcanvas', function(event) {
@@ -285,8 +284,9 @@ export function WaveformControl(AppState) {
                                     <div class="input-group selectable ${shouldBeSelected(idx, 'a', 'voltage') ? 'selected' : ''}" tabindex="0" 
                                         id="voltage_group_${idx}" onclick="setSelected(${idx}, 'a', 'voltage')">
                                         <div class="input-group-text fs-4 justify-content-center" style="width:50px; font-style:italic; font-family:Cambria;">V</div>
-                                        <input type="text" class="form-control text-end fs-4" 
-                                            id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" 
+                                        <input type="text" class="form-control text-end fs-4 touch-entry touch-entry-numeric" 
+                                            id="voltage_input_${idx}" value="${scaledAmplitudeA.toFixed(1)}" data-touch-steps="0.1,1,5,10"
+                                            data-reset-type="voltage" data-reset-idx="${idx}"
                                             onblur="setVoltageDirect(${idx}, event.target.value)" 
                                             onkeydown="if(event.key==='Enter'){setVoltageDirect(${idx}, event.target.value)}">
                                         <div class="input-group-text text-muted" style="width:50px;">V<sub>rms</sub></div>
@@ -296,8 +296,9 @@ export function WaveformControl(AppState) {
                                     <div class="input-group selectable ${shouldBeSelected(idx, 'b', 'current') ? 'selected' : ''}" tabindex="0" 
                                         id="current_group_${idx}" onclick="setSelected(${idx}, 'b', 'current')">
                                         <div class="input-group-text fs-4 justify-content-center" style="width:50px; font-style:italic; font-family:Cambria;">I</div>
-                                        <input type="text" class="form-control text-end fs-4" 
-                                            id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" 
+                                        <input type="text" class="form-control text-end fs-4 touch-entry touch-entry-numeric" 
+                                            id="current_input_${idx}" value="${scaledAmplitudeB.toFixed(2)}" data-touch-steps="0.01,0.1,0.5,1"
+                                            data-reset-type="current" data-reset-idx="${idx}"
                                             onblur="setCurrentDirect(${idx}, event.target.value)" 
                                             onkeydown="if(event.key==='Enter'){setCurrentDirect(${idx}, event.target.value)}">
                                         <div class="input-group-text text-muted" style="width:50px;">A<sub>rms</sub></div>
@@ -307,8 +308,9 @@ export function WaveformControl(AppState) {
                                     <div class="input-group selectable ${shouldBeSelected(idx, 'a', 'phase') ? 'selected' : ''}" tabindex="0" 
                                         id="phase_a_group_${idx}" onclick="setSelected(${idx}, 'a', 'phase')">
                                         <div class="input-group-text fs-4 justify-content-center" style="width:50px; font-style:italic; font-family: Cambria;">&Phi;<sub>V</sub></div>
-                                        <input type="text" class="form-control text-end fs-4" 
-                                            id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" 
+                                        <input type="text" class="form-control text-end fs-4 touch-entry touch-entry-numeric" 
+                                            id="phase_input_${idx}" value="${synth.phase_a.toFixed(1)}" data-touch-steps="1,5,10,30,45"
+                                            data-reset-type="phase" data-reset-idx="${idx}" data-reset-channel="a"
                                             onblur="setPhaseDirect(${idx}, 'a', event.target.value)" 
                                             onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'a', event.target.value)}">
                                         <div class="input-group-text text-muted" style="width:50px;">°</div>
@@ -318,8 +320,9 @@ export function WaveformControl(AppState) {
                                     <div class="input-group selectable ${shouldBeSelected(idx, 'b', 'phase') ? 'selected' : ''}" tabindex="0" 
                                         id="phase_b_group_${idx}" onclick="setSelected(${idx}, 'b', 'phase')">
                                         <div class="input-group-text fs-4 justify-content-center" style="width:50px; font-style:italic; font-family: Cambria;">&Phi;<sub>I</sub></div>
-                                        <input type="text" class="form-control text-end fs-4" 
-                                            id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" 
+                                        <input type="text" class="form-control text-end fs-4 touch-entry touch-entry-numeric" 
+                                            id="phase_input_${idx}" value="${synth.phase_b.toFixed(1)}" data-touch-steps="1,5,10,30,45"
+                                            data-reset-type="phase" data-reset-idx="${idx}" data-reset-channel="b"
                                             onblur="setPhaseDirect(${idx}, 'b', event.target.value)" 
                                             onkeydown="if(event.key==='Enter'){setPhaseDirect(${idx}, 'b', event.target.value)}">
                                         <div class="input-group-text text-muted" style="width:50px;">°</div>
@@ -329,8 +332,9 @@ export function WaveformControl(AppState) {
                                     <div class="input-group selectable ${shouldBeSelected(idx, 'a', 'frequency') ? 'selected' : ''}" tabindex="0" 
                                         id="frequency_group_${idx}" onclick="setSelected(${idx}, 'a', 'frequency')">
                                         <div class="input-group-text fs-4 justify-content-center" style="width:50px; font-style:italic; font-family: Cambria;">f</div>
-                                        <input type="text" class="form-control text-end fs-4" 
-                                            id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" 
+                                        <input type="text" class="form-control text-end fs-4 touch-entry touch-entry-numeric" 
+                                            id="frequency_input_${idx}" value="${synth.frequency_a.toFixed(1)}" data-touch-steps="0.1,1,5"
+                                            data-reset-type="frequency"
                                             onblur="setFrequencyDirect(event.target.value)" 
                                             onkeydown="if(event.key==='Enter'){setFrequencyDirect(event.target.value)}">
                                         <div class="input-group-text text-muted" style="width:50px;">Hz</div>
@@ -341,10 +345,6 @@ export function WaveformControl(AppState) {
                     </div>
                     `;
                 }).join('')}
-                <!-- Increment Control Buttons (shared for all phases) -->
-                <div class="col px-1" style="max-width:100px" id="increment_buttons_waveform_control">
-                    ${incrementButtons()}
-                </div>
             </div>
         </div>
     </div>
@@ -388,10 +388,6 @@ export function HarmonicControl(AppState) {
                 </div>
                 `;
                 }).join('')}
-                <!-- Increment Control Buttons (shared for all phases) -->
-                <div class="col px-1" style="max-width:100px" id="increment_buttons_waveform_control">
-                    ${incrementButtons()}
-                </div>
             </div>
         </div>
     </div>
@@ -403,7 +399,7 @@ export function HarmonicControl(AppState) {
     const waveSub = channel === 'a' ? 'v' : 'i';
     const waveType = channel === 'a' ? 'voltage' : 'current';
     return `
-        <table class="table table-sm mb-2 text-center border-${phase}-${waveType}">
+        <table class="table table-sm mb-1 text-center border-${phase}-${waveType} harmonics-table">
             <thead>
                 <tr class="small py-1">
                     <th>H<sub>${waveSub}</sub></th>
@@ -422,9 +418,34 @@ export function HarmonicControl(AppState) {
                     const styleA = 'style="width:52px;"';
                     const styleP = 'style="width:64px;"';
                     return `<tr>
-                        <td class="selectable" ${styleH} tabindex="0" id="harmonic_${channel}_order_${i}_${idx}" onclick="setSelected(${idx}, '${channel}', 'harmonic_order_${i}')">${h ? h.order : '&mdash;'}</td>
-                        <td class="selectable" ${styleA} tabindex="0" id="harmonic_${channel}_amp_${i}_${idx}" onclick="setSelected(${idx}, '${channel}', 'harmonic_amp_${i}')">${h ? (h.amplitude + '%') : '&mdash;'}</td>
-                        <td class="selectable" ${styleP} tabindex="0" id="harmonic_${channel}_phase_${i}_${idx}" onclick="setSelected(${idx}, '${channel}', 'harmonic_phase_${i}')">${h ? (h.phase + '&deg;') : '&mdash;'}</td>
+                        <td ${styleH}>
+                            <input type="text" class="form-control form-control-sm text-center touch-entry touch-entry-numeric touch-entry-integer touch-entry-odd harmonic-cell-input"
+                                id="harmonic_${channel}_order_${i}_${idx}"
+                                min="3" max="127" step="2"
+                                data-touch-integer="true" data-touch-odd="true" data-touch-precision="0" data-touch-steps="1,5"
+                                data-reset-type="harmonic" data-reset-idx="${idx}" data-reset-channel="${channel}" data-reset-id="${i}" data-reset-property="order"
+                                value="${h ? h.order : ''}"
+                                onblur="setHarmonicDirect(${idx}, '${channel}', ${i}, 'order', event.target.value)"
+                                onkeydown="if(event.key==='Enter'){setHarmonicDirect(${idx}, '${channel}', ${i}, 'order', event.target.value)}">
+                        </td>
+                        <td ${styleA}>
+                            <input type="text" class="form-control form-control-sm text-center touch-entry touch-entry-numeric harmonic-cell-input"
+                                id="harmonic_${channel}_amp_${i}_${idx}"
+                                min="0" max="100" data-touch-precision="2" data-touch-steps="1,5,10"
+                                data-reset-type="harmonic" data-reset-idx="${idx}" data-reset-channel="${channel}" data-reset-id="${i}" data-reset-property="amp"
+                                value="${h ? h.amplitude : ''}"
+                                onblur="setHarmonicDirect(${idx}, '${channel}', ${i}, 'amp', event.target.value)"
+                                onkeydown="if(event.key==='Enter'){setHarmonicDirect(${idx}, '${channel}', ${i}, 'amp', event.target.value)}">
+                        </td>
+                        <td ${styleP}>
+                            <input type="text" class="form-control form-control-sm text-center touch-entry touch-entry-numeric harmonic-cell-input"
+                                id="harmonic_${channel}_phase_${i}_${idx}"
+                                min="-360" max="360" data-touch-precision="2" data-touch-steps="1,5,10,30,45"
+                                data-reset-type="harmonic" data-reset-idx="${idx}" data-reset-channel="${channel}" data-reset-id="${i}" data-reset-property="phase"
+                                value="${h ? h.phase : ''}"
+                                onblur="setHarmonicDirect(${idx}, '${channel}', ${i}, 'phase', event.target.value)"
+                                onkeydown="if(event.key==='Enter'){setHarmonicDirect(${idx}, '${channel}', ${i}, 'phase', event.target.value)}">
+                        </td>
                     </tr>`;
                 }).join('')}
             </tbody>

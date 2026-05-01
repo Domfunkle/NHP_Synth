@@ -14,6 +14,86 @@ def create_app(command_queue, state_manager):
     app = Flask(__name__)
     socketio = SocketIO(app, cors_allowed_origins="*")
 
+    def queue_harmonic_reapply_commands():
+        """Re-send active harmonics so new calibration settings take effect immediately."""
+        synths = getattr(state_manager, 'synths', [])
+        queued = 0
+        for synth_id, synth_state in enumerate(synths):
+            for channel in ['a', 'b']:
+                harmonics_key = f'harmonics_{channel}'
+                for idx, harmonic in enumerate(synth_state.get(harmonics_key, [])):
+                    order = harmonic.get('order')
+                    amplitude = harmonic.get('amplitude')
+                    phase = harmonic.get('phase', 0)
+                    if order is None or amplitude is None:
+                        continue
+                    try:
+                        command_queue.put({
+                            'synth_id': synth_id,
+                            'command': 'set_harmonics',
+                            'channel': channel,
+                            'value': {
+                                'id': int(harmonic.get('id', idx)),
+                                'order': int(order),
+                                'amplitude': float(amplitude),
+                                'phase': float(phase)
+                            }
+                        })
+                        queued += 1
+                    except (TypeError, ValueError):
+                        continue
+        return queued
+
+    def default_settings_payload():
+        return {
+            'maxVoltage': 250,
+            'maxCurrent': 10,
+            'chartRefreshRate': 100,
+            'precisionDigits': 2,
+            'autoSaveSettings': True,
+            'debugMode': False,
+            'synthAutoOn': [False, False, False],
+            'harmonicCalibration': {
+                'enabled': False,
+                'mode': 'linear',
+                'linearA': 0.0,
+                'perHarmonic': {}
+            }
+        }
+
+    def normalize_harmonic_calibration(raw_cfg):
+        normalized = {
+            'enabled': False,
+            'mode': 'linear',
+            'linearA': 0.0,
+            'perHarmonic': {}
+        }
+
+        if not isinstance(raw_cfg, dict):
+            return normalized
+
+        normalized['enabled'] = bool(raw_cfg.get('enabled', False))
+        mode = str(raw_cfg.get('mode', 'linear'))
+        normalized['mode'] = mode if mode in ['linear', 'per_harmonic'] else 'linear'
+        try:
+            normalized['linearA'] = float(raw_cfg.get('linearA', 0.0))
+        except (TypeError, ValueError):
+            normalized['linearA'] = 0.0
+
+        per_harmonic = raw_cfg.get('perHarmonic', {})
+        if isinstance(per_harmonic, dict):
+            cleaned = {}
+            for key, value in per_harmonic.items():
+                try:
+                    harmonic_order = int(key)
+                    phase_correction = float(value)
+                    cleaned[str(harmonic_order)] = phase_correction
+                except (TypeError, ValueError):
+                    continue
+            normalized['perHarmonic'] = cleaned
+
+        return normalized
+
     @app.route('/api/synths', methods=['GET'])
     def get_synths():
         try:
@@ -159,9 +239,12 @@ def create_app(command_queue, state_manager):
     def get_settings():
         try:
             settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            defaults = default_settings_payload()
             if os.path.exists(settings_file):
                 with open(settings_file, 'r') as f:
                     settings = json.load(f)
+                settings = {**defaults, **settings}
+                settings['harmonicCalibration'] = normalize_harmonic_calibration(settings.get('harmonicCalibration', {}))
                 
                 # Sync synthAutoOn with current synth state if available
                 if hasattr(state_manager, 'synths') and len(state_manager.synths) >= 3:
@@ -169,16 +252,7 @@ def create_app(command_queue, state_manager):
                         synth.get('auto_on', False) for synth in state_manager.synths[:3]
                     ]
             else:
-                # Default settings
-                settings = {
-                    'maxVoltage': 250,
-                    'maxCurrent': 10,
-                    'chartRefreshRate': 100,
-                    'precisionDigits': 2,
-                    'autoSaveSettings': True,
-                    'debugMode': False,
-                    'synthAutoOn': [False, False, False]  # Default auto_on for 3 synths
-                }
+                settings = defaults
                 # Save default settings
                 with open(settings_file, 'w') as f:
                     json.dump(settings, f, indent=2)
@@ -189,8 +263,19 @@ def create_app(command_queue, state_manager):
     @app.route('/api/settings', methods=['POST'])
     def save_settings():
         try:
-            settings = request.json
             settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            previous_harmonic_calibration = None
+            if os.path.exists(settings_file):
+                try:
+                    with open(settings_file, 'r') as f:
+                        previous_settings = json.load(f)
+                    previous_harmonic_calibration = normalize_harmonic_calibration(
+                        previous_settings.get('harmonicCalibration', {})
+                    )
+                except Exception:
+                    previous_harmonic_calibration = None
+
+            settings = request.json
             
             # Ensure the directory exists
             os.makedirs(os.path.dirname(settings_file), exist_ok=True)
@@ -212,6 +297,28 @@ def create_app(command_queue, state_manager):
                 return jsonify({'error': 'Invalid synthAutoOn'}), 400
             if not all(isinstance(x, bool) for x in settings['synthAutoOn']):
                 return jsonify({'error': 'Invalid synthAutoOn values'}), 400
+            harmonic_cal = settings.get('harmonicCalibration', {})
+            if not isinstance(harmonic_cal, dict):
+                return jsonify({'error': 'Invalid harmonicCalibration'}), 400
+            if 'enabled' in harmonic_cal and not isinstance(harmonic_cal.get('enabled'), bool):
+                return jsonify({'error': 'Invalid harmonicCalibration.enabled'}), 400
+            if harmonic_cal.get('mode', 'linear') not in ['linear', 'per_harmonic']:
+                return jsonify({'error': 'Invalid harmonicCalibration.mode'}), 400
+            try:
+                float(harmonic_cal.get('linearA', 0.0))
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Invalid harmonicCalibration.linearA'}), 400
+            per_harmonic = harmonic_cal.get('perHarmonic', {})
+            if not isinstance(per_harmonic, dict):
+                return jsonify({'error': 'Invalid harmonicCalibration.perHarmonic'}), 400
+            for order, correction in per_harmonic.items():
+                try:
+                    int(order)
+                    float(correction)
+                except (TypeError, ValueError):
+                    return jsonify({'error': f'Invalid per-harmonic correction for order {order}'}), 400
+
+            settings['harmonicCalibration'] = normalize_harmonic_calibration(harmonic_cal)
             
             # Add timestamp
             settings['lastSaved'] = datetime.datetime.now().isoformat()
@@ -219,6 +326,17 @@ def create_app(command_queue, state_manager):
             # Save to file
             with open(settings_file, 'w') as f:
                 json.dump(settings, f, indent=2)
+
+            current_harmonic_calibration = normalize_harmonic_calibration(
+                settings.get('harmonicCalibration', {})
+            )
+
+            if previous_harmonic_calibration != current_harmonic_calibration:
+                queued = queue_harmonic_reapply_commands()
+                if queued > 0:
+                    app.logger.info(
+                        f"Queued {queued} harmonic command(s) to apply calibration immediately."
+                    )
             
             # Update synth state manager with new auto_on settings
             if hasattr(state_manager, 'synths') and settings.get('synthAutoOn'):
@@ -226,6 +344,11 @@ def create_app(command_queue, state_manager):
                     if i < len(state_manager.synths):
                         state_manager.synths[i]['auto_on'] = auto_on
                 state_manager.save_state()  # Save updated synth state
+
+            try:
+                socketio.emit('settingsUpdated', {'settings': settings})
+            except Exception:
+                pass
             
             return jsonify({'status': 'Settings saved', 'settings': settings})
         except Exception as e:
@@ -234,17 +357,8 @@ def create_app(command_queue, state_manager):
     @app.route('/api/settings/reset', methods=['POST'])
     def reset_settings():
         try:
-            # Default settings
-            settings = {
-                'maxVoltage': 250,
-                'maxCurrent': 10,
-                'chartRefreshRate': 100,
-                'precisionDigits': 2,
-                'autoSaveSettings': True,
-                'debugMode': False,
-                'synthAutoOn': [False, False, False],
-                'lastSaved': datetime.datetime.now().isoformat()
-            }
+            settings = default_settings_payload()
+            settings['lastSaved'] = datetime.datetime.now().isoformat()
             
             settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
             
@@ -253,8 +367,63 @@ def create_app(command_queue, state_manager):
             
             with open(settings_file, 'w') as f:
                 json.dump(settings, f, indent=2)
+
+            try:
+                socketio.emit('settingsUpdated', {'settings': settings})
+            except Exception:
+                pass
             
             return jsonify({'status': 'Settings reset', 'settings': settings})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/settings/reset-harmonic-calibration', methods=['POST'])
+    def reset_harmonic_calibration_settings():
+        try:
+            settings_file = os.path.join(os.path.dirname(__file__), '..', 'config', 'settings.json')
+            defaults = default_settings_payload()
+
+            # Load existing settings so we only change harmonicCalibration.
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+            else:
+                settings = defaults
+
+            settings = {**defaults, **settings}
+            previous_harmonic_calibration = normalize_harmonic_calibration(
+                settings.get('harmonicCalibration', {})
+            )
+
+            settings['harmonicCalibration'] = normalize_harmonic_calibration(
+                defaults.get('harmonicCalibration', {})
+            )
+            settings['lastSaved'] = datetime.datetime.now().isoformat()
+
+            os.makedirs(os.path.dirname(settings_file), exist_ok=True)
+            with open(settings_file, 'w') as f:
+                json.dump(settings, f, indent=2)
+
+            current_harmonic_calibration = normalize_harmonic_calibration(
+                settings.get('harmonicCalibration', {})
+            )
+
+            if previous_harmonic_calibration != current_harmonic_calibration:
+                queued = queue_harmonic_reapply_commands()
+                if queued > 0:
+                    app.logger.info(
+                        f"Queued {queued} harmonic command(s) after calibration reset."
+                    )
+
+            try:
+                socketio.emit('settingsUpdated', {'settings': settings})
+            except Exception:
+                pass
+
+            return jsonify({
+                'status': 'Harmonic calibration reset',
+                'settings': settings
+            })
         except Exception as e:
             return jsonify({'error': str(e)}), 500
         

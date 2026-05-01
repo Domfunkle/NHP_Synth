@@ -10,6 +10,13 @@
 
     --L3-voltage-color: hsl(220, 100%, 90%);
     --L3-current-color: hsl(220, 100%, 60%);
+
+    /* Runtime-tuned by app.js using actual kiosk content height. */
+    --harmonics-cell-pad-y: 0.12rem;
+    --harmonics-cell-pad-x: 0.18rem;
+    --harmonics-head-font-size: 0.76rem;
+    --harmonics-input-height: 1.45rem;
+    --harmonics-input-font-size: 0.82rem;
 }
 
 
@@ -318,6 +325,31 @@ html, body {
 
 #settings-pane .form-check-label {
     font-size: 0.85rem;
+}
+
+/* Harmonics tab: keep the full 3-phase table set inside 800x480 viewport. */
+#harmonics-pane .harmonics-table {
+    margin-bottom: 0.2rem;
+}
+
+#harmonics-pane .harmonics-table th,
+#harmonics-pane .harmonics-table td {
+    padding: var(--harmonics-cell-pad-y) var(--harmonics-cell-pad-x);
+    vertical-align: middle;
+    line-height: 1.05;
+}
+
+#harmonics-pane .harmonics-table thead th {
+    font-size: var(--harmonics-head-font-size);
+}
+
+#harmonics-pane .harmonic-cell-input {
+    min-height: var(--harmonics-input-height);
+    height: var(--harmonics-input-height);
+    padding: 0.04rem 0.22rem;
+    font-size: var(--harmonics-input-font-size);
+    line-height: 1;
+    border-radius: 0.15rem;
 }
 
 #settings-pane .alert {

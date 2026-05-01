@@ -10,32 +10,6 @@ def _to_float(value, fallback):
         return fallback
 
 
-def _normalize_harmonics(harmonics):
-    normalized = []
-    if not isinstance(harmonics, list):
-        return normalized
-
-    for idx, harmonic in enumerate(harmonics):
-        if not isinstance(harmonic, dict):
-            continue
-        order = harmonic.get("order")
-        amplitude = harmonic.get("amplitude")
-        phase = harmonic.get("phase", 0.0)
-        try:
-            normalized.append(
-                {
-                    "id": idx,
-                    "order": int(order),
-                    "amplitude": float(amplitude),
-                    "phase": float(phase),
-                }
-            )
-        except (TypeError, ValueError):
-            continue
-
-    return normalized
-
-
 def poll_synth_states(synths, state_manager):
     """Read back live values from hardware and reconcile state_manager.synths in-place.
 
@@ -61,8 +35,6 @@ def poll_synth_states(synths, state_manager):
             freq_b = synth.get_frequency("b")
             phase_a = synth.get_phase("a")
             phase_b = synth.get_phase("b")
-            harmonics_a = synth.get_harmonics("a")
-            harmonics_b = synth.get_harmonics("b")
         except Exception as exc:
             logger.warning(f"Synth {synth_id} poll failed: {exc}")
             continue
@@ -76,12 +48,12 @@ def poll_synth_states(synths, state_manager):
             synth_state.setdefault("enabled", {})["b"] = expected_enabled_b
             changed = True
 
-        new_amp_a = _to_float(amp_a, synth_state.get("amplitude_a", 0.0))
-        new_amp_b = _to_float(amp_b, synth_state.get("amplitude_b", 0.0))
-        new_freq_a = _to_float(freq_a, synth_state.get("frequency_a", 50.0))
-        new_freq_b = _to_float(freq_b, synth_state.get("frequency_b", 50.0))
-        new_phase_a = _to_float(phase_a, synth_state.get("phase_a", 0.0))
-        new_phase_b = _to_float(phase_b, synth_state.get("phase_b", 0.0))
+        new_amp_a = round(_to_float(amp_a, synth_state.get("amplitude_a", 0.0)), 3)
+        new_amp_b = round(_to_float(amp_b, synth_state.get("amplitude_b", 0.0)), 3)
+        new_freq_a = round(_to_float(freq_a, synth_state.get("frequency_a", 50.0)), 3)
+        new_freq_b = round(_to_float(freq_b, synth_state.get("frequency_b", 50.0)), 3)
+        new_phase_a = round(_to_float(phase_a, synth_state.get("phase_a", 0.0)), 2)
+        new_phase_b = round(_to_float(phase_b, synth_state.get("phase_b", 0.0)), 2)
 
         if synth_state.get("amplitude_a") != new_amp_a:
             synth_state["amplitude_a"] = new_amp_a
@@ -100,15 +72,6 @@ def poll_synth_states(synths, state_manager):
             changed = True
         if synth_state.get("phase_b") != new_phase_b:
             synth_state["phase_b"] = new_phase_b
-            changed = True
-
-        normalized_a = _normalize_harmonics(harmonics_a)
-        normalized_b = _normalize_harmonics(harmonics_b)
-        if synth_state.get("harmonics_a", []) != normalized_a:
-            synth_state["harmonics_a"] = normalized_a
-            changed = True
-        if synth_state.get("harmonics_b", []) != normalized_b:
-            synth_state["harmonics_b"] = normalized_b
             changed = True
 
         if changed:

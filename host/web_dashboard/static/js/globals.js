@@ -18,7 +18,7 @@ import {
 // Settings Management
 import {
     initializeSettings, getSettings, getSetting, setSetting, updateSettings,
-    resetSettings, saveSettingsToServer, setupSettingsListeners,
+    resetSettings, resetHarmonicCalibration, saveSettingsToServer, setupSettingsListeners, applyServerSettings,
     getMaxVoltage, getMaxCurrent, isDebugMode, getChartRefreshRate, getPrecisionDigits,
     getSynthAutoOn, getSynthAutoOnForIndex
 } from './settings.js';
@@ -28,7 +28,7 @@ import {
     setVoltageDirect, setCurrentDirect, setPhaseDirect, setFrequencyDirect,
     incrementVoltage, incrementCurrent, incrementPhase, incrementFrequency,
     resetVoltage, resetCurrent, resetPhase, resetFrequency,
-    incrementHarmonic, resetHarmonic
+    incrementHarmonic, resetHarmonic, setHarmonicDirect
 } from './components/synthHandlers.js';
 
 // State Management  
@@ -91,6 +91,7 @@ window.resetPhase = resetPhase;
 window.resetFrequency = resetFrequency;
 window.incrementHarmonic = incrementHarmonic;
 window.resetHarmonic = resetHarmonic;
+window.setHarmonicDirect = setHarmonicDirect;
 
 // === STATE MANAGEMENT (used in onclick attributes and dynamic calls) ===
 window.AppState = AppState;
@@ -164,8 +165,10 @@ window.getSetting = getSetting;
 window.setSetting = setSetting;
 window.updateSettings = updateSettings;
 window.resetSettings = resetSettings;
+window.resetHarmonicCalibration = resetHarmonicCalibration;
 window.saveSettings = saveSettingsToServer;
 window.setupSettingsListeners = setupSettingsListeners;
+window.applyServerSettings = applyServerSettings;
 window.getMaxVoltage = getMaxVoltage;
 window.getMaxCurrent = getMaxCurrent;
 window.isDebugMode = isDebugMode;

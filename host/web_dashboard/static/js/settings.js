@@ -8,11 +8,67 @@ const DEFAULT_SETTINGS = {
     precisionDigits: 2,
     autoSaveSettings: true,
     debugMode: false,
-    synthAutoOn: [false, false, false]
+    synthAutoOn: [false, false, false],
+    harmonicCalibration: {
+        enabled: false,
+        mode: 'linear',
+        linearA: 0,
+        perHarmonic: {}
+    }
 };
 
 // Current settings state
 let currentSettings = { ...DEFAULT_SETTINGS };
+const HARMONIC_ORDERS = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27, 29, 31];
+
+function ensurePerHarmonicInputs() {
+    const grid = document.getElementById('harmonic-per-grid');
+    if (!grid || grid.dataset.built === '1') return;
+
+    grid.innerHTML = HARMONIC_ORDERS.map((order) => `
+        <div class="col-6">
+            <label for="harmonic-per-${order}" class="form-label small mb-1">H${order}</label>
+            <input type="number" class="form-control form-control-sm touch-entry touch-entry-numeric" id="harmonic-per-${order}" step="0.1" value="0" data-touch-steps="1,5,10,30,45">
+        </div>
+    `).join('');
+
+    grid.dataset.built = '1';
+}
+
+function readPerHarmonicInputs() {
+    ensurePerHarmonicInputs();
+    const result = {};
+    HARMONIC_ORDERS.forEach((order) => {
+        const input = document.getElementById(`harmonic-per-${order}`);
+        if (!input) return;
+        const value = parseFloat(input.value || '0');
+        if (!isNaN(value)) {
+            result[String(order)] = value;
+        }
+    });
+    return result;
+}
+
+function writePerHarmonicInputs(perHarmonic) {
+    ensurePerHarmonicInputs();
+    HARMONIC_ORDERS.forEach((order) => {
+        const input = document.getElementById(`harmonic-per-${order}`);
+        if (!input) return;
+        const raw = perHarmonic && Object.prototype.hasOwnProperty.call(perHarmonic, String(order))
+            ? perHarmonic[String(order)]
+            : 0;
+        const value = parseFloat(raw);
+        input.value = Number.isFinite(value) ? value : 0;
+    });
+}
+
+function updateHarmonicCalibrationModeUI(modeOverride = null) {
+    const mode = modeOverride || currentSettings?.harmonicCalibration?.mode || 'linear';
+    const linearWrap = document.getElementById('harmonic-linear-wrap');
+    const perWrap = document.getElementById('harmonic-per-wrap');
+    if (linearWrap) linearWrap.style.display = mode === 'linear' ? '' : 'none';
+    if (perWrap) perWrap.style.display = mode === 'per_harmonic' ? '' : 'none';
+}
 
 /**
  * Initialize settings from server
@@ -41,6 +97,15 @@ export async function initializeSettings() {
     }
 }
 
+export function applyServerSettings(serverSettings) {
+    if (!serverSettings || typeof serverSettings !== 'object') return;
+    currentSettings = { ...DEFAULT_SETTINGS, ...serverSettings };
+    updateSettingsUI();
+    if (currentSettings.lastSaved) {
+        updateLastSavedTimestamp(currentSettings.lastSaved);
+    }
+}
+
 /**
  * Get current settings
  */
@@ -62,8 +127,8 @@ export async function setSetting(key, value) {
     if (key in currentSettings) {
         currentSettings[key] = value;
         
-        // Auto-save if enabled
-        if (currentSettings.autoSaveSettings) {
+        // Harmonic calibration must always persist immediately so changes are applied live.
+        if (key === 'harmonicCalibration' || currentSettings.autoSaveSettings) {
             await saveSettingsToServer();
         }
         
@@ -130,6 +195,45 @@ export async function resetSettings() {
         }
     } catch (error) {
         console.error('Error resetting settings:', error);
+        showSaveError();
+        return false;
+    }
+}
+
+/**
+ * Reset only harmonic calibration settings to defaults.
+ */
+export async function resetHarmonicCalibration() {
+    try {
+        const response = await fetch('/api/settings/reset-harmonic-calibration', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            currentSettings = { ...DEFAULT_SETTINGS, ...result.settings };
+            updateSettingsUI();
+
+            if (result.settings.lastSaved) {
+                updateLastSavedTimestamp(result.settings.lastSaved);
+            } else {
+                document.getElementById('settings-last-saved').textContent = 'Just now';
+            }
+
+            console.log('Harmonic calibration reset to defaults');
+            showSaveConfirmation();
+            return true;
+        }
+
+        const error = await response.json();
+        console.error('Failed to reset harmonic calibration:', error.error);
+        showSaveError();
+        return false;
+    } catch (error) {
+        console.error('Error resetting harmonic calibration:', error);
         showSaveError();
         return false;
     }
@@ -226,6 +330,28 @@ function collectCurrentFormValues() {
         }
     });
     currentSettings.synthAutoOn = autoOnValues;
+
+    // Harmonic calibration settings
+    const harmonicEnabled = document.getElementById('harmonic-cal-enabled');
+    const harmonicMode = document.getElementById('harmonic-cal-mode');
+    const harmonicLinearA = document.getElementById('harmonic-linear-a');
+    const currentHarmonic = currentSettings.harmonicCalibration || {
+        enabled: false,
+        mode: 'linear',
+        linearA: 0,
+        perHarmonic: {}
+    };
+
+    currentSettings.harmonicCalibration = {
+        enabled: harmonicEnabled ? harmonicEnabled.checked : !!currentHarmonic.enabled,
+        mode: harmonicMode ? harmonicMode.value : (currentHarmonic.mode || 'linear'),
+        linearA: harmonicLinearA ? parseFloat(harmonicLinearA.value || '0') : parseFloat(currentHarmonic.linearA || 0),
+        perHarmonic: readPerHarmonicInputs()
+    };
+
+    if (isNaN(currentSettings.harmonicCalibration.linearA)) {
+        currentSettings.harmonicCalibration.linearA = 0;
+    }
     
     console.log('Collected form values:', currentSettings);
 }
@@ -234,6 +360,7 @@ function collectCurrentFormValues() {
  * Update the settings UI with current values
  */
 function updateSettingsUI() {
+    ensurePerHarmonicInputs();
     // Hardware limits
     const maxVoltageInput = document.getElementById('max-voltage-setting');
     const maxCurrentInput = document.getElementById('max-current-setting');
@@ -284,6 +411,29 @@ function updateSettingsUI() {
         }
     });
 
+    // Harmonic calibration settings
+    const harmonicCfg = currentSettings.harmonicCalibration || {
+        enabled: false,
+        mode: 'linear',
+        linearA: 0,
+        perHarmonic: {}
+    };
+    const harmonicEnabled = document.getElementById('harmonic-cal-enabled');
+    const harmonicMode = document.getElementById('harmonic-cal-mode');
+    const harmonicLinearA = document.getElementById('harmonic-linear-a');
+
+    if (harmonicEnabled) {
+        harmonicEnabled.checked = !!harmonicCfg.enabled;
+    }
+    if (harmonicMode) {
+        harmonicMode.value = harmonicCfg.mode || 'linear';
+    }
+    if (harmonicLinearA) {
+        harmonicLinearA.value = Number.isFinite(Number(harmonicCfg.linearA)) ? Number(harmonicCfg.linearA) : 0;
+    }
+    writePerHarmonicInputs(harmonicCfg.perHarmonic || {});
+    updateHarmonicCalibrationModeUI();
+
     // Debug: Add close browser button if in debug mode
     let closeBtn = document.getElementById('close-browser-btn');
     // Find the Display & System card body
@@ -318,6 +468,7 @@ function updateSettingsUI() {
  * Setup event listeners for settings controls
  */
 export function setupSettingsListeners() {
+    ensurePerHarmonicInputs();
     // Hardware limits
     const maxVoltageInput = document.getElementById('max-voltage-setting');
     const maxCurrentInput = document.getElementById('max-current-setting');
@@ -385,6 +536,62 @@ export function setupSettingsListeners() {
                 await setSetting('synthAutoOn', currentAutoOn);
             });
         }
+    });
+
+    const harmonicEnabled = document.getElementById('harmonic-cal-enabled');
+    const harmonicMode = document.getElementById('harmonic-cal-mode');
+    const harmonicLinearA = document.getElementById('harmonic-linear-a');
+    const harmonicPerInputs = HARMONIC_ORDERS
+        .map((order) => document.getElementById(`harmonic-per-${order}`))
+        .filter(Boolean);
+
+    function currentHarmonicCfg() {
+        const cfg = currentSettings.harmonicCalibration || {
+            enabled: false,
+            mode: 'linear',
+            linearA: 0,
+            perHarmonic: {}
+        };
+        return {
+            enabled: !!cfg.enabled,
+            mode: cfg.mode || 'linear',
+            linearA: Number.isFinite(Number(cfg.linearA)) ? Number(cfg.linearA) : 0,
+            perHarmonic: cfg.perHarmonic || {}
+        };
+    }
+
+    if (harmonicEnabled) {
+        harmonicEnabled.addEventListener('change', async (e) => {
+            const cfg = currentHarmonicCfg();
+            cfg.enabled = e.target.checked;
+            await setSetting('harmonicCalibration', cfg);
+        });
+    }
+
+    if (harmonicMode) {
+        harmonicMode.addEventListener('change', async (e) => {
+            const cfg = currentHarmonicCfg();
+            cfg.mode = e.target.value;
+            updateHarmonicCalibrationModeUI(cfg.mode);
+            await setSetting('harmonicCalibration', cfg);
+        });
+    }
+
+    if (harmonicLinearA) {
+        harmonicLinearA.addEventListener('change', async (e) => {
+            const cfg = currentHarmonicCfg();
+            const value = parseFloat(e.target.value || '0');
+            cfg.linearA = Number.isFinite(value) ? value : 0;
+            await setSetting('harmonicCalibration', cfg);
+        });
+    }
+
+    harmonicPerInputs.forEach((input) => {
+        input.addEventListener('change', async () => {
+            const cfg = currentHarmonicCfg();
+            cfg.perHarmonic = readPerHarmonicInputs();
+            await setSetting('harmonicCalibration', cfg);
+        });
     });
 }
 
@@ -493,4 +700,15 @@ export function getSynthAutoOn() {
 export function getSynthAutoOnForIndex(index) {
     const autoOnSettings = currentSettings.synthAutoOn || [false, false, false];
     return autoOnSettings[index] || false;
+}
+
+export function getHarmonicCalibration() {
+    return {
+        ...(currentSettings.harmonicCalibration || {
+            enabled: false,
+            mode: 'linear',
+            linearA: 0,
+            perHarmonic: {}
+        })
+    };
 }

@@ -20,7 +20,7 @@ export async function incrementVoltage(idx, delta) {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
         const VOLTAGE_MAX = getMaxVoltage();
-        let value = (synth.amplitude_a / 100) * VOLTAGE_MAX + delta;
+        let value = normalizeFloat((synth.amplitude_a / 100) * VOLTAGE_MAX + delta);
         value = Math.max(0, Math.min(VOLTAGE_MAX, value));
         const percent = roundToPrecision(value / VOLTAGE_MAX * 100, 2);
         await setSynthAmplitude(synth.id, 'a', percent);
@@ -59,7 +59,7 @@ export async function incrementCurrent(idx, delta) {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
         const CURRENT_MAX = getMaxCurrent();
-        let value = (synth.amplitude_b / 100) * CURRENT_MAX + delta;
+        let value = normalizeFloat((synth.amplitude_b / 100) * CURRENT_MAX + delta);
         value = Math.max(0, Math.min(CURRENT_MAX, value));
         const percent = +(value / CURRENT_MAX * 100).toFixed(2);
         await setSynthAmplitude(synth.id, 'b', percent);
@@ -105,11 +105,15 @@ function wrapClamp(high, low, value) {
     return v;
 }
 
+function normalizeFloat(value, precision = 6) {
+    return Number(Number(value).toFixed(precision));
+}
+
 export async function incrementPhase(idx, channel, delta) {
     try {
         const synthState = getSynthState();
         const synth = synthState.synths[idx];
-        let value = synth[`phase_${channel}`] + delta;
+        let value = normalizeFloat(synth[`phase_${channel}`] + delta);
         value = wrapClamp(180, -180, value);
         value = +value.toFixed(2);
         await setSynthPhase(synth.id, channel, value);
@@ -150,7 +154,7 @@ export async function incrementFrequency(delta) {
         for (const synth of synthState.synths) {
             if (!synth || typeof synth.id === 'undefined') continue;
             for (const channel of ['a', 'b']) {
-                let value = synth[`frequency_${channel}`] + delta;
+                let value = normalizeFloat(synth[`frequency_${channel}`] + delta);
                 value = Math.max(FREQ_MIN, Math.min(FREQ_MAX, value));
                 value = +value.toFixed(2);
                 await setSynthFrequency(synth.id, channel, value);
@@ -220,16 +224,14 @@ export async function incrementHarmonic(idx, channel, id, delta, property) {
         };
 
         if (property === 'order') {
-            const maxOrder = 127;
-            value.order += delta;
-            value.order = Math.max(1, Math.min(maxOrder, value.order));
-            value.order = +value.order.toFixed(0);
+            value.order = normalizeFloat(value.order + delta);
+            value.order = normalizeHarmonicOrder(value.order);
         } else if (property === 'amp') {
-            value.amplitude += delta;
+            value.amplitude = normalizeFloat(value.amplitude + delta);
             value.amplitude = Math.max(0, Math.min(100, value.amplitude));
             value.amplitude = +value.amplitude.toFixed(2);
         } else if (property === 'phase') {
-            value.phase += delta;
+            value.phase = normalizeFloat(value.phase + delta);
             value.phase = ((value.phase % 360) + 360) % 360;
             value.phase = +value.phase.toFixed(2);
         } else {
@@ -240,6 +242,54 @@ export async function incrementHarmonic(idx, channel, id, delta, property) {
         console.error('incrementHarmonic: error incrementing harmonic', error);
         return;
     }
+}
+
+export async function setHarmonicDirect(idx, channel, id, property, rawValue) {
+    try {
+        const synthState = getSynthState();
+        const synth = synthState?.synths?.[idx];
+        if (!synth) return;
+
+        const harmonic = synth[`harmonics_${channel}`]?.find(h => h.id == id);
+        const value = {
+            id,
+            order: harmonic?.order ?? 3,
+            amplitude: harmonic?.amplitude ?? 0,
+            phase: harmonic?.phase ?? 0
+        };
+
+        let parsed = parseFloat(rawValue);
+        if (Number.isNaN(parsed)) return;
+
+        if (property === 'order') {
+            value.order = normalizeHarmonicOrder(parsed);
+        } else if (property === 'amp') {
+            parsed = Math.max(0, Math.min(100, parsed));
+            value.amplitude = +parsed.toFixed(2);
+        } else if (property === 'phase') {
+            parsed = Math.max(-360, Math.min(360, parsed));
+            value.phase = +parsed.toFixed(2);
+        } else {
+            return;
+        }
+
+        await setSynthHarmonics(synth.id, channel, value);
+    } catch (error) {
+        console.error('setHarmonicDirect: error setting harmonic', error);
+    }
+}
+
+function normalizeHarmonicOrder(input) {
+    let order = Math.round(Number(input));
+    if (Number.isNaN(order)) order = 3;
+
+    // Device supports odd harmonic orders from 3..127.
+    order = Math.max(3, Math.min(127, order));
+    if (order % 2 === 0) {
+        // Prefer the nearest larger odd unless at upper bound.
+        order = order < 127 ? order + 1 : 125;
+    }
+    return order;
 }
 
 export async function resetHarmonic(idx, channel, id, property) {
