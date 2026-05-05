@@ -11,6 +11,7 @@ class SynthStateManager:
         self.defaults = []
         self.synths = {}
         self.num_synths = 0
+        self.synth_device_map = []
         self.selection_mode = None
 
         self.defaults = copy.deepcopy(self.load_defaults())
@@ -79,7 +80,15 @@ class SynthStateManager:
         """Save the current synth/channel values to JSON file."""
         try:
             with open(self.state_file, 'w') as f:
-                json.dump({'num_synths': self.num_synths, 'synths': self.synths}, f, indent=2)
+                json.dump(
+                    {
+                        'num_synths': self.num_synths,
+                        'synths': self.synths,
+                        'synth_device_map': self.synth_device_map,
+                    },
+                    f,
+                    indent=2,
+                )
         except Exception as e:
             logger.warning(f"Could not save synth state: {e}")
 
@@ -97,6 +106,8 @@ class SynthStateManager:
                 return copy.deepcopy(self.defaults)
             self.num_synths = state.get('num_synths', len(self.defaults))
             self.synths = state.get('synths', copy.deepcopy(self.defaults))
+            synth_device_map = state.get('synth_device_map', [])
+            self.synth_device_map = synth_device_map if isinstance(synth_device_map, list) else []
             self.num_synths = len(self.synths)
             # Ensure harmonics lists are lists
             for synth in self.synths:

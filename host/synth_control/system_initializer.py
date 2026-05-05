@@ -16,6 +16,163 @@ class SystemInitializer:
     Handles full system initialization for NHP_Synth.
     """
     @staticmethod
+    def _expected_synth_count(state_manager):
+        defaults = getattr(state_manager, 'defaults', [])
+        expected = len(defaults) if isinstance(defaults, list) and defaults else 3
+        return max(3, expected)
+
+    @staticmethod
+    def _close_synths(synths):
+        for synth in synths:
+            try:
+                synth.__exit__(None, None, None)
+            except Exception:
+                pass
+
+    @staticmethod
+    def _order_endpoints(endpoints, state_manager):
+        saved_map = getattr(state_manager, 'synth_device_map', [])
+        if not isinstance(saved_map, list) or not saved_map:
+            return sorted(endpoints, key=lambda ep: ep.get('path', ''))
+
+        index_by_key = {key: idx for idx, key in enumerate(saved_map)}
+
+        def sort_key(endpoint):
+            key = endpoint.get('device_key')
+            if key in index_by_key:
+                return (0, index_by_key[key])
+            return (1, endpoint.get('path', ''))
+
+        return sorted(endpoints, key=sort_key)
+
+    @staticmethod
+    def _connect_synths(endpoints):
+        synth_init_errors = []
+        synths = []
+        connected_endpoints = []
+
+        for i, endpoint in enumerate(endpoints):
+            device_path = endpoint.get('path')
+            device_name = device_path.split('/')[-1] if device_path else f'device-{i}'
+            try:
+                synth = SynthInterface(port=device_path, id=i)
+                synth.__enter__()
+                synths.append(synth)
+                connected_endpoints.append(endpoint)
+
+                try:
+                    enabled_a = synth.get_enabled('a')
+                    enabled_b = synth.get_enabled('b')
+                    amp_a = synth.get_amplitude('a')
+                    amp_b = synth.get_amplitude('b')
+                    freq_a = synth.get_frequency('a')
+                    freq_b = synth.get_frequency('b')
+                    phase_a = synth.get_phase('a')
+                    phase_b = synth.get_phase('b')
+                    harmonics_a = synth.get_harmonics('a')
+                    harmonics_b = synth.get_harmonics('b')
+                    logger.debug(
+                        f"enabled_a={enabled_a}, enabled_b={enabled_b}, amp_a={amp_a}, amp_b={amp_b}, "
+                        f"freq_a={freq_a}, freq_b={freq_b}, phase_a={phase_a}, phase_b={phase_b}, "
+                        f"harmonics_a={harmonics_a}, harmonics_b={harmonics_b}"
+                    )
+                    try:
+                        synth.set_frequency('a', freq_a)
+                        synth.set_frequency('b', freq_b)
+                        freq_a_check = synth.get_frequency('a')
+                        freq_b_check = synth.get_frequency('b')
+                        if freq_a != freq_a_check or freq_b != freq_b_check:
+                            synth_init_errors.append(
+                                f"Synth {i} ({device_name}) frequency round-trip mismatch: "
+                                f"a={freq_a}->{freq_a_check}, b={freq_b}->{freq_b_check}"
+                            )
+                        else:
+                            logger.debug(f"✓ Synth {i} frequency round-trip OK")
+                    except Exception as e:
+                        synth_init_errors.append(
+                            f"Synth {i} ({device_name}) frequency round-trip error: {e}"
+                        )
+
+                    logger.info(f"✓ Synth {i} Comms OK ({endpoint.get('device_key', 'unknown-key')})")
+                except Exception as comms_e:
+                    logger.error(f"Could not read parameters from {device_name}: {comms_e}")
+                    synth_init_errors.append(f"Synth {i} ({device_name}) comms error: {comms_e}")
+            except Exception as e:
+                logger.error(f"✗ Failed to connect to {device_name}: {e}")
+                synth_init_errors.append(f"Synth {i} ({device_name}) connection error: {e}")
+
+        if synth_init_errors:
+            logger.warning("Synthesizer issues:")
+            for err in synth_init_errors:
+                logger.warning(f"  {err}")
+
+        return synths, connected_endpoints
+
+    @staticmethod
+    def _sync_synths_to_state(synths, state_manager):
+        for i, synth in enumerate(synths):
+            for ch in ['a', 'b']:
+                try:
+                    synth.clear_harmonics(ch)
+                except Exception as e:
+                    logger.warning(f"Synth {i} failed to clear harmonics on channel {ch}: {e}")
+
+            synth_state = state_manager.synths[i] if i < len(state_manager.synths) else None
+            if not synth_state:
+                continue
+
+            try:
+                if not synth_state.get('auto_on', False):
+                    synth.set_enabled('a', False)
+                    synth.set_enabled('b', False)
+                else:
+                    synth.set_enabled('a', synth_state.get('enabled', {}).get('a', False))
+                    synth.set_enabled('b', synth_state.get('enabled', {}).get('b', False))
+
+                synth.set_amplitude('a', synth_state.get('amplitude_a', 0))
+                synth.set_amplitude('b', synth_state.get('amplitude_b', 0))
+                synth.set_frequency('a', synth_state.get('frequency_a', 50))
+                synth.set_frequency('b', synth_state.get('frequency_b', 50))
+                synth.set_phase('a', synth_state.get('phase_a', 0))
+                synth.set_phase('b', synth_state.get('phase_b', 0))
+
+                for ch in ['a', 'b']:
+                    harmonics_key = f'harmonics_{ch}'
+                    harmonics = synth_state.get(harmonics_key, [])
+                    for h in harmonics:
+                        synth.set_harmonics(ch, h)
+            except Exception as e:
+                logger.warning(f"Synth {i} failed to set state: {e}")
+
+    @staticmethod
+    def reconnect_synths(state_manager, existing_synths=None):
+        """Reconnect synthesizers after USB disruptions while preserving phase assignment."""
+        expected_count = SystemInitializer._expected_synth_count(state_manager)
+        endpoints = SynthDiscovery.find_all_synth_endpoints()
+        if len(endpoints) != expected_count:
+            raise Exception(
+                f"Expected {expected_count} synthesizers, discovered {len(endpoints)}. "
+                "Waiting for all synths before reconnect."
+            )
+
+        # Only close current handles once we know all expected synth endpoints are present.
+        if existing_synths:
+            SystemInitializer._close_synths(existing_synths)
+
+        ordered_endpoints = SystemInitializer._order_endpoints(endpoints, state_manager)
+        synths, connected_endpoints = SystemInitializer._connect_synths(ordered_endpoints)
+        if len(synths) != expected_count:
+            raise Exception(
+                f"Expected {expected_count} synthesizers after reconnect, connected {len(synths)}"
+            )
+
+        SystemInitializer._sync_synths_to_state(synths, state_manager)
+        state_manager.synth_device_map = [ep.get('device_key') for ep in connected_endpoints]
+        state_manager.num_synths = len(synths)
+        state_manager.save_state()
+        return synths, connected_endpoints
+
+    @staticmethod
     def initialize_system(state_manager):
         # The full code of initialize_system from main.py, with references to globals replaced by arguments.
 
@@ -33,7 +190,6 @@ class SystemInitializer:
             {'addr': 0x3a, 'name': 'Harmonics', 'function': 'harmonics'}
         ]
 
-        synth_init_errors = []
         encoder_init_errors = []
         try:
             i2c = busio.I2C(board.SCL, board.SDA)
@@ -166,55 +322,26 @@ class SystemInitializer:
         step2_start_time = time.time()
         logger.info("[Step 2/4] Connecting to synthesizer...")
         try:
-            device_paths = SynthDiscovery.find_all_synth_devices()
-            logger.info(f"Found {len(device_paths)} synthesizer(s)")
-            synths = []
-            for i, device_path in enumerate(device_paths):
-                try:
-                    synth = SynthInterface(port = device_path, id = i)
-                    synth.__enter__()
-                    synths.append(synth)
-                    device_name = device_path.split('/')[-1]
-                    # Test comms by reading parameters for both channels
-                    try:
-                        enabled_a = synth.get_enabled('a')
-                        enabled_b = synth.get_enabled('b')
-                        amp_a = synth.get_amplitude('a')
-                        amp_b = synth.get_amplitude('b')
-                        freq_a = synth.get_frequency('a')
-                        freq_b = synth.get_frequency('b')
-                        phase_a = synth.get_phase('a')
-                        phase_b = synth.get_phase('b')
-                        harmonics_a = synth.get_harmonics('a')
-                        harmonics_b = synth.get_harmonics('b')
-                        logger.debug(f"enabled_a={enabled_a}, enabled_b={enabled_b}, amp_a={amp_a}, amp_b={amp_b}, freq_a={freq_a}, freq_b={freq_b}, phase_a={phase_a}, phase_b={phase_b}, harmonics_a={harmonics_a}, harmonics_b={harmonics_b}")
-                        # Round-trip set/get test for frequency (set to current value)
-                        try:
-                            synth.set_frequency('a', freq_a)
-                            synth.set_frequency('b', freq_b)
-                            freq_a_check = synth.get_frequency('a')
-                            freq_b_check = synth.get_frequency('b')
-                            if freq_a != freq_a_check or freq_b != freq_b_check:
-                                synth_init_errors.append(f"Synth {i} ({device_name}) frequency round-trip mismatch: a={freq_a}->{freq_a_check}, b={freq_b}->{freq_b_check}")
-                            else:
-                                logger.debug(f"✓ Synth {i} frequency round-trip OK")
-                        except Exception as e:
-                            synth_init_errors.append(f"Synth {i} ({device_name}) frequency round-trip error: {e}")
+            expected_count = SystemInitializer._expected_synth_count(state_manager)
+            endpoints = SynthDiscovery.find_all_synth_endpoints()
+            if len(endpoints) != expected_count:
+                raise Exception(
+                    f"Expected {expected_count} synthesizers, discovered {len(endpoints)}. "
+                    "Aborting initialization."
+                )
 
-                        logger.info(f"✓ Synth {i} Comms OK")
-                    except Exception as comms_e:
-                        logger.error(f"Could not read parameters from {device_name}: {comms_e}")
-                        synth_init_errors.append(f"Synth {i} ({device_name}) comms error: {comms_e}")
-                except Exception as e:
-                    device_name = device_path.split('/')[-1]
-                    logger.error(f"✗ Failed to connect to {device_name}: {e}")
-                    synth_init_errors.append(f"Synth {i} ({device_name}) connection error: {e}")
-            if not synths:
-                raise Exception("No synthesizers could be connected")
-            if synth_init_errors:
-                logger.warning("Synthesizer issues:")
-                for err in synth_init_errors:
-                    logger.warning(f"  {err}")
+            ordered_endpoints = SystemInitializer._order_endpoints(endpoints, state_manager)
+            logger.info(f"Found {len(ordered_endpoints)} synthesizer(s)")
+
+            synths, connected_endpoints = SystemInitializer._connect_synths(ordered_endpoints)
+            if len(synths) != expected_count:
+                raise Exception(
+                    f"Expected {expected_count} synthesizers, connected {len(synths)}. "
+                    "Aborting initialization."
+                )
+
+            state_manager.synth_device_map = [ep.get('device_key') for ep in connected_endpoints]
+            device_paths = [ep.get('path') for ep in connected_endpoints]
 
             step2_end_time = time.time()
             step2_duration = step2_end_time - step2_start_time
@@ -222,34 +349,7 @@ class SystemInitializer:
 
             step3_start_time = time.time()
             logger.info("[Step 3/4] Syncing synths to state_manager...")
-            for i, synth in enumerate(synths):
-                for ch in ['a', 'b']:
-                    try:
-                        synth.clear_harmonics(ch)
-                    except Exception as e:
-                        logger.warning(f"Synth {i} failed to clear harmonics on channel {ch}: {e}")
-                synth_state = state_manager.synths[i] if i < len(state_manager.synths) else None
-                if synth_state:
-                    try:
-                        if not synth_state.get('auto_on', False):
-                            synth.set_enabled('a', False)
-                            synth.set_enabled('b', False)
-                        else:
-                            synth.set_enabled('a', synth_state.get('enabled', {}).get('a', False))
-                            synth.set_enabled('b', synth_state.get('enabled', {}).get('b', False))
-                        synth.set_amplitude('a', synth_state.get('amplitude_a', 0))
-                        synth.set_amplitude('b', synth_state.get('amplitude_b', 0))
-                        synth.set_frequency('a', synth_state.get('frequency_a', 50))
-                        synth.set_frequency('b', synth_state.get('frequency_b', 50))
-                        synth.set_phase('a', synth_state.get('phase_a', 0))
-                        synth.set_phase('b', synth_state.get('phase_b', 0))
-                        for ch in ['a', 'b']:
-                            harmonics_key = f'harmonics_{ch}'
-                            harmonics = synth_state.get(harmonics_key, [])
-                            for h in harmonics:
-                                synth.set_harmonics(ch, h)
-                    except Exception as e:
-                        logger.warning(f"Synth {i} failed to set state: {e}")
+            SystemInitializer._sync_synths_to_state(synths, state_manager)
 
             step3_end_time = time.time()
             step3_duration = step3_end_time - step3_start_time
@@ -289,9 +389,6 @@ class SystemInitializer:
                 'num_synths': num_synths
             }
         except Exception as e:
-            for synth in synths:
-                try:
-                    synth.__exit__(None, None, None)
-                except:
-                    pass
+            if 'synths' in locals():
+                SystemInitializer._close_synths(synths)
             raise

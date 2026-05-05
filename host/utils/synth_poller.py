@@ -13,12 +13,13 @@ def _to_float(value, fallback):
 def poll_synth_states(synths, state_manager):
     """Read back live values from hardware and reconcile state_manager.synths in-place.
 
-    Returns the number of synth entries updated.
+    Returns poll health and update counts.
     """
     if not synths or not hasattr(state_manager, "synths"):
-        return 0
+        return {"updated_count": 0, "failed_count": 0, "total_count": 0}
 
     updated_count = 0
+    failed_count = 0
     synth_count = min(len(synths), len(state_manager.synths))
 
     for synth_id in range(synth_count):
@@ -37,6 +38,16 @@ def poll_synth_states(synths, state_manager):
             phase_b = synth.get_phase("b")
         except Exception as exc:
             logger.warning(f"Synth {synth_id} poll failed: {exc}")
+            failed_count += 1
+            continue
+
+        # If any critical numeric readback is invalid (None), treat this synth as a failed poll cycle.
+        # This catches cases where ESP boot logs/noise are read instead of protocol responses.
+        if any(v is None for v in [amp_a, amp_b, freq_a, freq_b, phase_a, phase_b]):
+            logger.warning(
+                f"Synth {synth_id} poll returned invalid numeric readbacks; skipping state update for this cycle"
+            )
+            failed_count += 1
             continue
 
         expected_enabled_a = bool(enabled_a)
@@ -77,4 +88,8 @@ def poll_synth_states(synths, state_manager):
         if changed:
             updated_count += 1
 
-    return updated_count
+    return {
+        "updated_count": updated_count,
+        "failed_count": failed_count,
+        "total_count": synth_count,
+    }

@@ -41,6 +41,7 @@ def main():
 
         # State management: load the state and assign synths
         state.num_synths = num_synths
+        state.save_state()
 
         # Wrap hardware encoders and pixels in Encoder objects
         encoder_objs = {
@@ -66,6 +67,12 @@ def main():
             save_interval = 5.0  # seconds
             last_poll_time = time.time()
             poll_interval = 2.5  # seconds
+            consecutive_full_poll_failures = 0
+            consecutive_partial_poll_failures = 0
+            reconnect_threshold = 3
+            partial_reconnect_threshold = 5
+            reconnect_cooldown_seconds = 8.0
+            last_reconnect_attempt = 0.0
             while True:
                 try:
                     # Process queued commands from the dashboard
@@ -77,9 +84,58 @@ def main():
                     if now - last_poll_time > poll_interval:
                         for synth in synths:
                             synth.silent = True
-                        poll_synth_states(synths, state)
+                        poll_result = poll_synth_states(synths, state)
                         for synth in synths:
                             synth.silent = False
+
+                        total_count = poll_result.get('total_count', 0)
+                        failed_count = poll_result.get('failed_count', 0)
+                        if total_count > 0 and failed_count == total_count:
+                            consecutive_full_poll_failures += 1
+                        else:
+                            consecutive_full_poll_failures = 0
+
+                        if failed_count > 0:
+                            consecutive_partial_poll_failures += 1
+                        else:
+                            consecutive_partial_poll_failures = 0
+
+                        if (
+                            (
+                                consecutive_full_poll_failures >= reconnect_threshold
+                                or consecutive_partial_poll_failures >= partial_reconnect_threshold
+                            )
+                            and (now - last_reconnect_attempt) >= reconnect_cooldown_seconds
+                        ):
+                            logger.warning(
+                                "Detected sustained synth communication failure "
+                                f"(full={consecutive_full_poll_failures}, partial={consecutive_partial_poll_failures}, "
+                                f"failed_count={failed_count}/{total_count}). "
+                                "Attempting automatic reconnect."
+                            )
+                            last_reconnect_attempt = now
+                            try:
+                                recovered_synths, recovered_endpoints = SystemInitializer.reconnect_synths(
+                                    state,
+                                    existing_synths=synths,
+                                )
+                                # Keep original list object so existing references stay valid.
+                                synths[:] = recovered_synths
+                                encoder_manager.synth_interface = synths
+                                state.num_synths = len(synths)
+                                consecutive_full_poll_failures = 0
+                                consecutive_partial_poll_failures = 0
+                                logger.info(
+                                    "Automatic reconnect successful. "
+                                    f"Recovered {len(synths)} synth(s): "
+                                    f"{[ep.get('device_key') for ep in recovered_endpoints]}"
+                                )
+                            except Exception as reconnect_error:
+                                logger.error(
+                                    "Automatic reconnect failed (strict synth count enforced): "
+                                    f"{reconnect_error}"
+                                )
+
                         last_poll_time = now
 
                     now = time.time()
