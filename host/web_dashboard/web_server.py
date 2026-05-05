@@ -46,8 +46,8 @@ def create_app(command_queue, state_manager):
 
     def default_settings_payload():
         return {
-            'maxVoltage': 250,
-            'maxCurrent': 10,
+            'maxVoltage': 230,
+            'maxCurrent': 5,
             'chartRefreshRate': 100,
             'precisionDigits': 2,
             'autoSaveSettings': True,
